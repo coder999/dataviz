@@ -96,6 +96,8 @@ it. Nodes keep the order given, so pass them in reading order. People take their
 ribbon `slot`; everything else passes `tint: 1–5`. Each flow takes the colour of
 the source it comes from, or of the use it goes to when it leaves a hub. Labels
 are the name over the amount; on narrow charts names wrap inside a 30% margin.
+When small neighbouring nodes would stack their labels, the lower label moves down
+just far enough to clear the one above.
 Hovering a node highlights its flows. The hidden table lists every flow as
 From / To / Amount. There is no year axis and no rehearsal marks: draw one
 sankey per year and let a control pick the year.
@@ -153,6 +155,8 @@ CSP blocks them.
 
 ## Changes
 
+- **0.2.1** (2026-10-28): `DV.sankey` nudges a label down when the one above it in the
+  same column would overlap (small adjacent flows), and keeps room for it at the bottom.
 - **0.2.0** (2026-10-28): `DV.sankey`; status tokens `--dv-status-ok` and
   `--dv-status-error` (light and dark); `DV.theme()` also returns `statusOk` and
   `statusError`.

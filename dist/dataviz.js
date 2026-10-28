@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.2.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.2.1 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -31,7 +31,7 @@
     return signOf(v, +body === 0, o) + body + '%';
   }
 
-  const DV = { version: '0.2.0', fmt: { money, pct } };
+  const DV = { version: '0.2.1', fmt: { money, pct } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -449,8 +449,23 @@
             ? `${esc(p.data.source)} → ${esc(p.data.target)}<br><b class="dv-num">${money(p.data.value, { full: true })}</b>`
             : `<b>${esc(p.name)}</b><br><span class="dv-num">${money(p.value, { full: true })}</span>`) },
         series: [{
-          type: 'sankey', left: marg, right: marg, top: hasMid ? 40 : 8, bottom: 8, nodeWidth: sm ? 8 : 10, nodeGap: sm ? 14 : 16,
+          type: 'sankey', left: marg, right: marg, top: hasMid ? 40 : 8, bottom: 34, nodeWidth: sm ? 8 : 10, nodeGap: sm ? 14 : 16,
           nodeAlign: 'justify', layoutIterations: 0, draggable: false, animation: false,
+          // Small adjacent nodes put their two-line labels on top of each other. Labels arrive in data
+          // order, which is top-to-bottom within a column, so each side keeps the bottom of the last
+          // label it placed and nudges the next one down just enough to clear it.
+          labelLayout: (() => {
+            let prev = Infinity, bottom = {};
+            return p => {
+              if (p.dataIndex <= prev) bottom = {};
+              prev = p.dataIndex;
+              const n = d.nodes[p.dataIndex], s = n && side(n);
+              if (!s || s === 'mid') return {};
+              const r = p.labelRect, dy = Math.max(0, (bottom[s] == null ? -Infinity : bottom[s] + 3) - r.y);
+              bottom[s] = r.y + dy + r.height;
+              return { dy };
+            };
+          })(),
           emphasis: { focus: 'adjacency' }, lineStyle: { color: 'source', opacity: 0.32, curveness: 0.5 },
           data: d.nodes.map(n => {
             const s = side(n), w = marg - 10;
