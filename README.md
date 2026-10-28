@@ -53,6 +53,7 @@ DV.fan(el, { years, p5, p25, p50, p75, p95, marks, ages });
 DV.stacked(el, { years, series: [{ name, values, slot }], marks, ages });
 DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], marks });
 DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
+DV.lines(el, { years, series: [{ name, values, tint }], marks, ages });
 ```
 
 - `el` is an element or a selector. Every builder returns the ECharts instance.
@@ -76,8 +77,16 @@ DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value 
 - `ageSlots` (optional, every year chart): the entity slot for each `ages`
   row, so each person's ages wear that person's colour. Defaults to 1, 2, ….
 - Entity slots are for people. A series that is not a person (a tax bucket, an
-  asset class) passes `tint: 1–5` instead of `slot` on `DV.stacked`: the
-  `--dv-tint-N` ramp is Henle-navy tints with a neutral at 5, light and dark.
+  asset class) passes `tint: 1–5` instead of `slot`. The `--dv-tint-N` set alternates
+  dark and light (odd steps dark on the light theme, light on the dark one), so in a
+  stack of tints 1, 2, 3, 4, 5 any two neighbours differ by at least 3:1; steps two
+  apart differ by hue. For lines on the ground use the odd steps (1, 3, 5).
+- `yTicks` (DV.stacked, DV.lines): about that many value-axis ticks, e.g. 3 for $0 / $5M / $10M.
+- A score staff may carry `labelValues` aligned to `values`: the amount labels and where a
+  new run starts follow them (for example a full-year rate) while the band thickness keeps
+  `values` (the year's actual amount, thinner in a part year).
+- `DV.lines` draws several stepped lines on the shared year axis, not stacked. The first
+  series is heavier and carries the rehearsal marks.
 - `DV.score` on a narrow chart (< 560px) puts each staff's name above it across
   the full plot width and keeps rehearsal letters in one row. Marks whose boxes
   would collide merge into one box (`D·E`) on the first mark's line; every line
@@ -155,6 +164,10 @@ CSP blocks them.
 
 ## Changes
 
+- **0.2.2** (2026-10-28): the tint set is categorical: alternating dark and light navy,
+  slate and indigo-grey, so neighbouring bands of a stack differ by at least 3:1 (light and dark);
+  `DV.stacked` drops the stroke between bands and takes `yTicks`; `DV.score` staves take
+  `labelValues` (labels and runs follow them, bands keep `values`); new `DV.lines`.
 - **0.2.1** (2026-10-28): `DV.sankey` nudges a label down when the one above it in the
   same column would overlap (small adjacent flows), and keeps room for it at the bottom.
 - **0.2.0** (2026-10-28): `DV.sankey`; status tokens `--dv-status-ok` and
