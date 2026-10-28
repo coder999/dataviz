@@ -72,9 +72,15 @@ DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], ma
   `label` to "amount pending"). Those years draw as a hairline in the staff
   colour with the label at the start, and read as the label in the tooltip and
   the data table.
-- Every builder reads its colours from the chart element itself, so a site can
-  re-key a chart by redefining `--dv-entity-N` on that element (for example a
-  non-person ramp for a chart whose series are not people).
+- `ageSlots` (optional, every year chart): the entity slot for each `ages`
+  row, so each person's ages wear that person's colour. Defaults to 1, 2, ….
+- Entity slots are for people. A series that is not a person (a tax bucket, an
+  asset class) passes `tint: 1–5` instead of `slot` on `DV.stacked`: the
+  `--dv-tint-N` ramp is Henle-navy tints with a neutral at 5, light and dark.
+- `DV.score` on a narrow chart (< 560px) puts each staff's name above it across
+  the full plot width and keeps rehearsal letters in one row, hiding a letter
+  that would collide with a shown one (its dashed line stays; the active mark
+  always shows). A pending label steps past any mark line it would cross.
 
 ### Rehearsal marks across the page
 

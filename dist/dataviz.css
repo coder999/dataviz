@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.1.1 · "Full Score" visual system · MIT (fonts: OFL-1.1, see fonts/) */
+/*! coder999/dataviz v0.1.2 · "Full Score" visual system · MIT (fonts: OFL-1.1, see fonts/) */
 @font-face{font-family:"Bodoni Moda";src:url(fonts/bodoni-moda-latin-500-normal.woff2) format("woff2");font-weight:500;font-display:swap}
 @font-face{font-family:"Bodoni Moda";src:url(fonts/bodoni-moda-latin-700-normal.woff2) format("woff2");font-weight:700;font-display:swap}
 @font-face{font-family:"Source Serif 4";src:url(fonts/source-serif-4-latin-400-normal.woff2) format("woff2");font-weight:400;font-display:swap}
@@ -22,6 +22,8 @@
   --dv-entity-1:#b04a26; --dv-entity-2:#23786a; --dv-entity-3:#7a4b8c;
   --dv-entity-4:#8a6a10; --dv-entity-5:#2f62a3; --dv-entity-6:#5b7330;
   --dv-on-entity:#ffffff;
+  /* non-person ramp (Henle navy tints + a neutral) for series that are not people */
+  --dv-tint-1:#4a6797; --dv-tint-2:#7690b9; --dv-tint-3:#a3b5d2; --dv-tint-4:#c8d4e6; --dv-tint-5:#a9aeb7;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -34,6 +36,7 @@
     --dv-entity-1:#e27d55; --dv-entity-2:#4cb7a3; --dv-entity-3:#b48bd0;
     --dv-entity-4:#d6ae4a; --dv-entity-5:#77a6e8; --dv-entity-6:#9cba62;
     --dv-on-entity:#0d1829;
+    --dv-tint-1:#8fa9d9; --dv-tint-2:#6c89bf; --dv-tint-3:#4f6ea3; --dv-tint-4:#3a5683; --dv-tint-5:#687284;
   }
 }
 :root[data-theme="dark"]{
@@ -46,6 +49,7 @@
   --dv-entity-1:#e27d55; --dv-entity-2:#4cb7a3; --dv-entity-3:#b48bd0;
   --dv-entity-4:#d6ae4a; --dv-entity-5:#77a6e8; --dv-entity-6:#9cba62;
   --dv-on-entity:#0d1829;
+  --dv-tint-1:#8fa9d9; --dv-tint-2:#6c89bf; --dv-tint-3:#4f6ea3; --dv-tint-4:#3a5683; --dv-tint-5:#687284;
 }
 
 ::selection{background:var(--dv-accent);color:var(--dv-on-accent)}
@@ -71,6 +75,7 @@ button.dv-rm:hover{background:var(--dv-accent-wash)}
 .dv-plate::before{content:"";width:4px;height:13px;background:var(--dv-c)}
 .dv-slot-1{--dv-c:var(--dv-entity-1)}.dv-slot-2{--dv-c:var(--dv-entity-2)}.dv-slot-3{--dv-c:var(--dv-entity-3)}
 .dv-slot-4{--dv-c:var(--dv-entity-4)}.dv-slot-5{--dv-c:var(--dv-entity-5)}.dv-slot-6{--dv-c:var(--dv-entity-6)}
+.dv-tint-1{--dv-c:var(--dv-tint-1)}.dv-tint-2{--dv-c:var(--dv-tint-2)}.dv-tint-3{--dv-c:var(--dv-tint-3)}.dv-tint-4{--dv-c:var(--dv-tint-4)}.dv-tint-5{--dv-c:var(--dv-tint-5)}
 
 /* chart containers (DV adds .dv-chart); figures in the SVG follow the tabular rule */
 .dv-chart{width:100%;min-height:120px;position:relative}

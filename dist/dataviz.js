@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.1.1 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.1.2 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -31,7 +31,7 @@
     return signOf(v, +body === 0, o) + body + '%';
   }
 
-  const DV = { version: '0.1.1', fmt: { money, pct } };
+  const DV = { version: '0.1.2', fmt: { money, pct } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -54,12 +54,16 @@
     const cs = getComputedStyle(el), t = {};
     TOKENS.forEach(k => { t[camel(k)] = cs.getPropertyValue('--dv-' + k).trim(); });
     t.entity = [1, 2, 3, 4, 5, 6].map(i => cs.getPropertyValue('--dv-entity-' + i).trim());
+    t.tint = [1, 2, 3, 4, 5].map(i => cs.getPropertyValue('--dv-tint-' + i).trim());
     t.surface = surfaceOf(el, t.ground);
     t.width = el.clientWidth || 600;
     t.small = t.width < 560;
     return t;
   }
   const slotColor = (t, slot) => t.entity[((slot || 1) - 1) % 6];
+  // A series is a person/entity ({slot}) or, when it is not a person, a step of the tint ramp ({tint: 1-5}).
+  const seriesColor = (t, s, k) => (s.tint ? t.tint[(s.tint - 1) % 5] : slotColor(t, s.slot || k + 1));
+  const keyClass = (s, k) => (s.tint ? 'dv-tint-' + s.tint : 'dv-slot-' + (s.slot || k + 1));
   const alpha = (c, a) => root.echarts.color.modifyAlpha(c, a);
   const reduced = () => root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -145,10 +149,19 @@
     if (b) marks.toggle(b.dataset.dvMark);
   });
 
-  function markLayers(t, list, compact, pos) {
+  // gap (years): when set, labels sit in one row and a letter closer than `gap` years to a shown one
+  // is hidden (its line stays); the active mark always shows. Otherwise narrow charts stagger two tiers.
+  function markLayers(t, list, compact, pos, gap) {
     if (!list || !list.length) return {};
     list.forEach(m => known.set(m.mark, m));
     const act = marks.active, ev = list.find(m => m.mark === act);
+    let shown = null;
+    if (gap) {
+      shown = new Set(ev ? [ev.mark] : []);
+      list.slice().sort((a, b) => a.year - b.year).forEach(m => {
+        if (![...shown].some(k => Math.abs(known.get(k).year - m.year) < gap)) shown.add(m.mark);
+      });
+    }
     return {
       markLine: {
         symbol: 'none', animation: false, emphasis: { disabled: true },
@@ -158,13 +171,14 @@
           const on = m.mark === act;
           return { name: m.mark, xAxis: m.year,
             lineStyle: { color: on ? t.accent : t.markLine, width: on ? 1.5 : 1, type: on ? 'solid' : [2, 3] },
-            label: { distance: t.small && j % 2 ? (compact ? 17 : 21) : 3, backgroundColor: on ? t.accent : t.surface, color: on ? t.onAccent : t.accent } };
+            label: { show: !shown || shown.has(m.mark), distance: !gap && t.small && j % 2 ? (compact ? 17 : 21) : 3,
+              backgroundColor: on ? t.accent : t.surface, color: on ? t.onAccent : t.accent } };
         }),
       },
       markArea: ev ? { silent: true, itemStyle: { color: alpha(t.accent, 0.1) }, data: [[{ xAxis: ev.year }, { xAxis: ev.year + 1 }]] } : { data: [] },
     };
   }
-  const markRoom = (t, list) => (list && list.length ? (t.small ? 46 : 30) : 10);
+  const markRoom = (t, list, oneRow) => (list && list.length ? (t.small && !oneRow ? 46 : 30) : 10);
 
   /* ---------- shared axes / tooltip ---------- */
   function tip(t) {
@@ -172,20 +186,21 @@
       textStyle: { color: t.ink, fontFamily: t.fontUi, fontSize: 12 }, extraCssText: 'box-shadow:none;border-radius:2px',
       axisPointer: { type: 'line', lineStyle: { color: t.ink, width: 1 } } };
   }
-  const ttRow = (slot, name, val) => `<div class="dv-tt-row"><i class="dv-tt-key dv-slot-${slot}"></i>${esc(name)}<span class="dv-num">${val}</span></div>`;
+  const ttRow = (cls, name, val) => `<div class="dv-tt-row"><i class="dv-tt-key ${cls}"></i>${esc(name)}<span class="dv-num">${val}</span></div>`;
   const agesAt = (ages, i) => (ages ? ages.map(a => a[i]).filter(a => a != null).join(' · ') : '');
   const ttHead = (y, ages, i) => `<b class="dv-num">${y}</b>${ages ? ' · ages <span class="dv-num">' + agesAt(ages, i) + '</span>' : ''}`;
   const yearOf = ps => Math.floor((Array.isArray(ps) ? ps[0] : ps).axisValue);
 
-  // Year value-axis: one band per year [y, y+1), labels every 1/2/5/10/20 years, ages beneath
-  function yearAxis(t, years, ages, plotW) {
+  // Year value-axis: one band per year [y, y+1), labels every 1/2/5/10/20 years, ages beneath.
+  // ageSlots: entity slot per ages row (default 1, 2, ...), so each age wears its person's colour.
+  function yearAxis(t, years, ages, plotW, ageSlots, minGap) {
     const y0 = years[0], y1 = years[years.length - 1];
-    const perYear = (plotW || t.width) / years.length, need = ages ? (t.small ? 44 : 54) : 40;
+    const perYear = (plotW || t.width) / years.length, need = minGap || (ages ? (t.small ? 44 : 54) : 40);
     const step = [1, 2, 5, 10, 20, 25, 50].find(s => s * perYear >= need) || 50;
     const ticks = [];
     for (let y = Math.ceil((y0 + 1) / step) * step; y <= y1; y += step) ticks.push(y);
     const rich = { y: { color: t.ink, fontSize: 11.5, fontWeight: 500, fontFamily: t.fontUi }, d: { color: t.ink3, fontSize: 10.5 } };
-    (ages || []).forEach((_, k) => { rich['a' + k] = { color: slotColor(t, k + 1), fontSize: 10.5, fontWeight: 600, fontFamily: t.fontUi }; });
+    (ages || []).forEach((_, k) => { rich['a' + k] = { color: slotColor(t, (ageSlots || [])[k] || k + 1), fontSize: 10.5, fontWeight: 600, fontFamily: t.fontUi }; });
     return { type: 'value', min: y0, max: y1 + 1, interval: step,
       axisLine: { show: true, lineStyle: { color: t.ink } }, axisTick: { show: false },
       splitLine: { show: true, lineStyle: { color: t.ruleSoft } },
@@ -253,7 +268,7 @@
       grid: { left: 8, right: t.small ? 6 : 10, top: markRoom(t, d.marks), bottom: 0, containLabel: true },
       tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= d.years.length) return '';
         return `${ttHead(y, d.ages, i)}<br>Money lasts in <b class="dv-num">${pct(d.pct[i])}</b> of paths`; } }),
-      xAxis: yearAxis(t, d.years, d.ages, t.width - 48),
+      xAxis: yearAxis(t, d.years, d.ages, t.width - 48, d.ageSlots),
       yAxis: { type: 'value', min: lo, max: 100, interval: (100 - lo) > 40 ? 20 : 10, axisLine: { show: false }, axisTick: { show: false },
         splitLine: { lineStyle: { color: t.ruleSoft } }, axisLabel: { formatter: v => pct(v), color: t.ink2, fontSize: 10.5, fontFamily: t.fontUi } },
       series: [Object.assign({ type: 'line', data: yearData(d.years, d.pct), step: 'end', symbol: 'none',
@@ -278,7 +293,7 @@
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
           const r = (a, b) => `<span class="dv-num">${money(a)} – ${money(b)}</span>`;
           return `${ttHead(y, d.ages, i)}<br>Median <b class="dv-num">${money(d.p50[i])}</b><br>25th–75th ${r(d.p25[i], d.p75[i])}<br>5th–95th ${r(d.p5[i], d.p95[i])}`; } }),
-        xAxis: yearAxis(t, d.years, d.ages, t.width - 60),
+        xAxis: yearAxis(t, d.years, d.ages, t.width - 60, d.ageSlots),
         yAxis: moneyAxis(t),
         series: [band(names[0], d.p5, d.p95, 0.16), band(names[1], d.p25, d.p75, 0.3),
           Object.assign({ name: names[2], type: 'line', data: yearData(d.years, d.p50), step: 'end', symbol: 'none', z: 4,
@@ -299,11 +314,11 @@
       legend: legend(t, d.series.map(s => ({ name: s.name, icon: 'rect' }))),
       grid: { left: 8, right: t.small ? 6 : 12, top: (t.small && d.series.length > 3 ? 44 : 24) + markRoom(t, d.marks), bottom: 0, containLabel: true },
       tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
-        return ttHead(y, d.ages, i) + d.series.slice().reverse().map(s => ttRow(s.slot || 1, s.name, money(s.values[i]))).join('') +
+        return ttHead(y, d.ages, i) + d.series.map((s, k) => [s, k]).reverse().map(([s, k]) => ttRow(keyClass(s, k), s.name, money(s.values[i]))).join('') +
           `<div class="dv-tt-row">Total<span class="dv-num">${money(total(i))}</span></div>`; } }),
-      xAxis: yearAxis(t, d.years, d.ages, t.width - 60),
+      xAxis: yearAxis(t, d.years, d.ages, t.width - 60, d.ageSlots),
       yAxis: moneyAxis(t),
-      series: d.series.map((s, k) => stepBand(s.name, d.years, cum[k], cum[k + 1], { fill: slotColor(t, s.slot || k + 1), stroke: t.surface, lineWidth: 1 }))
+      series: d.series.map((s, k) => stepBand(s.name, d.years, cum[k], cum[k + 1], { fill: seriesColor(t, s, k), stroke: t.surface, lineWidth: 1 }))
         // invisible carrier for the axis tooltip and the rehearsal marks
         .concat([Object.assign({ type: 'line', data: yearData(d.years, cum[cum.length - 1]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 }, markLayers(t, d.marks, false))]),
     }), o.label || `Balances by type, stacked: total ${money(total(0))} in ${y0}, ${money(total(n - 1))} in ${d.years[n - 1]}`,
@@ -311,8 +326,10 @@
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(d.series.map(s => money(s.values[i])), [money(total(i))])) });
   };
 
-  // The income score. {years, ages:[[..],[..]], staves:[{name, values, slot, pending?}], marks}
+  // The income score. {years, ages:[[..],[..]], ageSlots?, staves:[{name, values, slot, pending?}], marks}
   // One staff per source; band thickness = amount; shared year axis with ages under each year.
+  // Narrow (<560px): each staff's name sits above it across the full plot width, and the
+  // rehearsal letters keep to one row, hiding a letter that would collide (its line stays).
   // pending: {from, to?, label?} marks years where the source exists but its amount is not known
   // yet; they draw as a hairline in the staff colour, labelled (default "amount pending").
   DV.score = function (el, d, o) {
@@ -323,27 +340,25 @@
     const cellText = (s, i) => (pend(s, d.years[i]) ? pendLabel(s) : money(s.values[i]));
     const MAX = Math.max.apply(null, S.map(s => Math.max.apply(null, s.values))) || 1;
     return mount(el, t => {
-      const sm = t.small, labelW = sm ? 104 : Math.min(200, Math.round(t.width * 0.2));
+      const sm = t.small, labelW = sm ? 6 : Math.min(200, Math.round(t.width * 0.2));
+      const plotW = t.width - labelW - (sm ? 6 : 12), perYear = plotW / d.years.length;
       const rich = { s: { color: t.ink, fontFamily: t.fontUi, fontSize: sm ? 11.5 : 13, lineHeight: 15, padding: [0, 0, 0, 8] } };
       S.forEach((s, i) => { rich['k' + i] = { width: 4, height: 14, backgroundColor: slotColor(t, s.slot || i + 1) }; });
       return {
-        grid: { left: labelW, right: sm ? 6 : 12, top: markRoom(t, d.marks), bottom: d.ages ? 40 : 26 },
+        grid: { left: labelW, right: sm ? 6 : 12, top: markRoom(t, d.marks, sm), bottom: d.ages ? 40 : 26 },
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= d.years.length) return '';
           return ttHead(y, d.ages, i) + S.map((s, k) => [s, k]).filter(([s]) => s.values[i] > 0 || pend(s, y))
-            .map(([s, k]) => ttRow(s.slot || k + 1, s.name, s.values[i] > 0 ? money(s.values[i]) : esc(pendLabel(s)))).join(''); } }),
-        xAxis: yearAxis(t, d.years, d.ages, t.width - labelW - 12),
+            .map(([s, k]) => ttRow(keyClass(s, k), s.name, s.values[i] > 0 ? money(s.values[i]) : esc(pendLabel(s)))).join(''); } }),
+        xAxis: yearAxis(t, d.years, d.ages, plotW, d.ageSlots, sm ? 60 : 0),
         yAxis: { type: 'category', inverse: true, data: S.map((_, i) => String(i)), axisLine: { show: false }, axisTick: { show: false },
           splitLine: { show: true, lineStyle: { color: t.ruleSoft } },
-          axisLabel: { align: 'left', margin: labelW - 2, rich, formatter: (v, i) => {
-            // narrow: "Owner · Source" wraps after the owner
-            const parts = sm ? S[i].name.split(' · ') : [S[i].name];
-            return `{k${i}|}{s|${parts[0]}}` + (parts[1] ? `\n{s|${parts.slice(1).join(' · ')}}` : '');
-          } } },
+          axisLabel: { show: !sm, align: 'left', margin: labelW - 2, rich, formatter: (v, i) => `{k${i}|}{s|${S[i].name}}` } },
         series: [
           { type: 'custom', silent: true, z: 2, data: S.map((_, i) => [y0, i]), encode: { x: 0, y: 1 },
             renderItem(params, api) {
               const i = params.dataIndex, vals = S[i].values, col = slotColor(t, S[i].slot || i + 1);
-              const cy = api.coord([y0, i])[1], maxH = api.size([0, 1])[1] * 0.8;
+              // narrow: the name takes the top of the row, the staff sits a little lower with thinner bands
+              const rowH = api.size([0, 1])[1], cy = api.coord([y0, i])[1] + (sm ? rowH * 0.16 : 0), maxH = rowH * (sm ? 0.5 : 0.8);
               const th = v => (v <= 0 ? 0 : Math.max(2, v / MAX * maxH)), x = y => api.coord([y, i])[0];
               const top = [], bot = [];
               vals.forEach((v, k) => { const h = th(v) / 2, a = x(y0 + k), b = x(y0 + k + 1); top.push([a, cy - h], [b, cy - h]); bot.push([a, cy + h], [b, cy + h]); });
@@ -351,6 +366,11 @@
                 { type: 'line', shape: { x1: x(y0), y1: cy, x2: x(y1 + 1), y2: cy }, style: { stroke: t.staff, lineWidth: 1 } },
                 { type: 'polygon', shape: { points: top.concat(bot.reverse()) }, style: { fill: col } },
               ];
+              if (sm) {
+                const ty = api.coord([y0, i])[1] - rowH / 2 + 5;
+                kids.push({ type: 'rect', shape: { x: x(y0), y: ty, width: 3, height: 11 }, style: { fill: col } },
+                  { type: 'text', style: { text: S[i].name, x: x(y0) + 8, y: ty - 1, verticalAlign: 'top', fill: t.ink, font: `500 11.5px ${t.fontUi}` } });
+              }
               // label each run where the amount steps (>1% of the score's max)
               const starts = vals.map((v, k) => (v > 0 && (k === 0 || Math.abs(v - vals[k - 1]) > MAX * 0.01) ? k : -1)).filter(k => k >= 0);
               starts.forEach((k, j) => {
@@ -364,13 +384,18 @@
               const p = S[i].pending;
               if (p) {
                 const a = x(Math.max(y0, p.from)), b = x((p.to == null ? y1 : Math.min(y1, p.to)) + 1);
+                // the label steps past any rehearsal-mark line it would cross
+                const txt = pendLabel(S[i]), w = txt.length * 5.9 + 6;
+                let lx = a + 5;
+                (d.marks || []).map(m => x(m.year)).sort((u, v) => u - v).forEach(mx => { if (mx > lx - 3 && mx < lx + w && mx + 5 + w <= b) lx = mx + 5; });
                 kids.push({ type: 'line', shape: { x1: a, y1: cy, x2: b, y2: cy }, style: { stroke: col, lineWidth: 1.5 } },
-                  { type: 'text', style: { text: pendLabel(S[i]), x: a + 5, y: cy - 4, verticalAlign: 'bottom', fill: t.ink2, font: `500 11px ${t.fontUi}` } });
+                  { type: 'text', style: { text: txt, x: lx, y: cy - 4, verticalAlign: 'bottom', fill: t.ink2, font: `500 11px ${t.fontUi}` } });
               }
               return { type: 'group', children: kids };
             } },
           // invisible carrier for the axis tooltip and the rehearsal marks
-          Object.assign({ type: 'line', data: d.years.map(y => [y + 0.5, 0]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 }, markLayers(t, d.marks, false, 'start')),
+          Object.assign({ type: 'line', data: d.years.map(y => [y + 0.5, 0]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 },
+            markLayers(t, d.marks, sm, 'start', sm ? Math.ceil(22 / perYear) : 0)),
         ],
       };
     }, o.label || `Income score, ${y0} to ${y1}. ` + S.map(s => `${s.name}: ${runsText(d.years, s.values)}` +
