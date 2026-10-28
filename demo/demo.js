@@ -46,5 +46,12 @@
     { name: 'Taxable', values: D.balances.taxable, slot: 4 },
     { name: 'Cash', values: D.balances.cash, slot: 6 },
   ] });
+  const hub = 'This year’s money';
+  DV.sankey('#c-sk', { nodes: [{ name: hub, tint: 5 }, { name: 'Alex · Pension', slot: 1 }, { name: 'Sam · Salary', slot: 2 },
+    { name: 'Alex · Social Security', slot: 1 }, { name: 'Pre-tax withdrawals', tint: 1 }, { name: 'Taxes', tint: 2 },
+    { name: 'Spending', tint: 3 }, { name: 'Saved', tint: 1 }], links: [
+    { source: 'Alex · Pension', target: hub, value: 52000 }, { source: 'Sam · Salary', target: hub, value: 168000 },
+    { source: 'Alex · Social Security', target: hub, value: 14000 }, { source: 'Pre-tax withdrawals', target: hub, value: 40000 },
+    { source: hub, target: 'Taxes', value: 62000 }, { source: hub, target: 'Spending', value: 190000 }, { source: hub, target: 'Saved', value: 22000 }] });
   DV.marks.set('B');
 })();

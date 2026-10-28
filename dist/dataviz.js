@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.1.3 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.2.0 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -31,13 +31,13 @@
     return signOf(v, +body === 0, o) + body + '%';
   }
 
-  const DV = { version: '0.1.3', fmt: { money, pct } };
+  const DV = { version: '0.2.0', fmt: { money, pct } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
   /* ---------- theme ---------- */
   const TOKENS = ['ground', 'plate', 'ink', 'ink-2', 'ink-3', 'rule', 'rule-soft', 'staff', 'mark-line',
-    'accent', 'accent-2', 'on-accent', 'accent-wash', 'on-entity', 'font-display', 'font-fig', 'font-ui'];
+    'accent', 'accent-2', 'on-accent', 'accent-wash', 'on-entity', 'status-ok', 'status-error', 'font-display', 'font-fig', 'font-ui'];
   const camel = s => s.replace(/-(\w)/g, (_, c) => c.toUpperCase());
 
   function surfaceOf(el, fallback) {
@@ -418,6 +418,54 @@
       (s.pending ? `; ${pendLabel(s)} from ${s.pending.from}` : '')).join('. '),
     { caption: o.label || `Income by source, ${y0} to ${y1}`, columns: yearCols(d.ages).concat(S.map(s => s.name)),
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(S.map(s => cellText(s, i)))) });
+  };
+
+  // Cash flow. {nodes:[{name, slot?|tint?}], links:[{source, target, value}]}, names unique.
+  // Sources (no incoming link) sit left with labels on their left, sinks right with labels on their
+  // right, anything between (a hub) carries its label above. Nodes keep the given order. People take
+  // their ribbon slot; everything else passes tint 1-5. Narrow charts wrap labels into the margins.
+  // greedy word wrap to at most n characters a line (labels the SVG renderer cannot wrap itself)
+  function wrap(text, n) {
+    const out = [];
+    String(text).split(' ').forEach(w => { const l = out.length - 1; if (l >= 0 && (out[l] + ' ' + w).length <= n) out[l] += ' ' + w; else out.push(w); });
+    return out;
+  }
+  DV.sankey = function (el, d, o) {
+    o = o || {};
+    const into = new Set(d.links.map(l => l.target)), from = new Set(d.links.map(l => l.source));
+    const side = n => (!into.has(n.name) ? 'left' : !from.has(n.name) ? 'right' : 'mid');
+    const flow = n => Math.max(...['source', 'target'].map(k => d.links.filter(l => l[k] === n.name).reduce((s, l) => s + l.value, 0)));
+    const total = d.links.filter(l => !into.has(l.source)).reduce((s, l) => s + l.value, 0);
+    const hasMid = d.nodes.some(n => side(n) === 'mid');
+    return mount(el, t => {
+      const sm = t.small, marg = sm ? Math.round(t.width * 0.3) : Math.min(220, Math.round(t.width * 0.22));
+      const col = n => (n.tint ? t.tint[(n.tint - 1) % 5] : n.slot ? slotColor(t, n.slot) : t.ink3);
+      const rich = { n: { color: t.ink, fontFamily: t.fontUi, fontSize: sm ? 11 : 12, lineHeight: sm ? 13 : 15 },
+        v: { color: t.ink2, fontFamily: t.fontFig, fontSize: sm ? 11 : 12, lineHeight: sm ? 13 : 15 } };
+      return {
+        tooltip: { trigger: 'item', confine: true, className: 'dv-tt', backgroundColor: t.plate, borderColor: t.rule, borderWidth: 1, padding: [8, 10],
+          textStyle: { color: t.ink, fontFamily: t.fontUi, fontSize: 12 }, extraCssText: 'box-shadow:none;border-radius:2px',
+          formatter: p => (p.dataType === 'edge'
+            ? `${esc(p.data.source)} → ${esc(p.data.target)}<br><b class="dv-num">${money(p.data.value, { full: true })}</b>`
+            : `<b>${esc(p.name)}</b><br><span class="dv-num">${money(p.value, { full: true })}</span>`) },
+        series: [{
+          type: 'sankey', left: marg, right: marg, top: hasMid ? 40 : 8, bottom: 8, nodeWidth: sm ? 8 : 10, nodeGap: sm ? 14 : 16,
+          nodeAlign: 'justify', layoutIterations: 0, draggable: false, animation: false,
+          emphasis: { focus: 'adjacency' }, lineStyle: { color: 'source', opacity: 0.32, curveness: 0.5 },
+          data: d.nodes.map(n => {
+            const s = side(n), w = marg - 10;
+            return { name: n.name, itemStyle: { color: col(n), borderWidth: 0 },
+              // names wrap to the margin width on their own line; the amount always gets its own line
+              label: { position: s === 'mid' ? 'top' : s, distance: 6, rich, align: s === 'left' ? 'right' : s === 'right' ? 'left' : 'center',
+                formatter: p => wrap(p.name, s === 'mid' ? 99 : Math.max(8, Math.floor(w / (sm ? 6 : 6.6)))).map(x => `{n|${x}}`).join('\n') + `\n{v|${money(p.value)}}` } };
+          }),
+          // a flow takes the colour of the source it comes from, or of the use it goes to
+          links: d.links.map(l => Object.assign({ lineStyle: { color: into.has(l.source) ? 'target' : 'source' } }, l)),
+        }],
+      };
+    }, o.label || `Cash flow: ${money(total)} in from ${d.nodes.filter(n => side(n) === 'left').length} sources. ` +
+      d.nodes.filter(n => side(n) === 'right').map(n => `${n.name} ${money(flow(n))}`).join(', '),
+    { caption: o.label || 'Cash flow', columns: ['From', 'To', 'Amount'], rows: d.links.map(l => [l.source, l.target, money(l.value, { full: true })]) });
   };
 
   DV.theme = theme;

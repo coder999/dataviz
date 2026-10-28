@@ -11,7 +11,7 @@ the demo.
 
 | File | What it is |
 | --- | --- |
-| `dataviz.css` | `--dv-*` tokens (light + dark), `@font-face` rules (relative `fonts/` urls), and the primitives: `.dv-rm`, `.dv-num`, `.dv-sh`, `.dv-plate`, `.dv-slot-1..6`, `.dv-sr-only` |
+| `dataviz.css` | `--dv-*` tokens (light + dark, including `--dv-status-ok` / `--dv-status-error`), `@font-face` rules (relative `fonts/` urls), and the primitives: `.dv-rm`, `.dv-num`, `.dv-sh`, `.dv-plate`, `.dv-slot-1..6`, `.dv-sr-only` |
 | `dataviz.js` | `window.DV`: theme reader, chart builders, rehearsal marks, formatters. Plain ES2020 script |
 | `echarts.min.js` | Apache ECharts 5.6.0, byte-identical to the npm `echarts@5.6.0` dist (sha256 `bf4a2235…07b1`, checked 2026-10-28) |
 | `fonts/` | Bodoni Moda 500/700, Source Serif 4 400/600, Public Sans 400/500/600 (latin woff2, from Fontsource) + their OFL-1.1 texts |
@@ -52,6 +52,7 @@ DV.survivalStrip(el, { years, pct, marks, ages });
 DV.fan(el, { years, p5, p25, p50, p75, p95, marks, ages });
 DV.stacked(el, { years, series: [{ name, values, slot }], marks, ages });
 DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], marks });
+DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
 ```
 
 - `el` is an element or a selector. Every builder returns the ECharts instance.
@@ -84,6 +85,28 @@ DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], ma
   its marks is active, so give each event its own `data-dv-mark` control too.
   The mark lines stop short of the staff names and break around the amounts.
   A pending label steps past any mark line it would cross.
+
+### Cash-flow sankey
+
+`DV.sankey` draws flows between named nodes (names must be unique). A node with
+no incoming link is a source: it sits in the left column with its label on the
+left. A node with no outgoing link is a use: right column, label on the right.
+Anything in between (a hub such as "This year's money") carries its label above
+it. Nodes keep the order given, so pass them in reading order. People take their
+ribbon `slot`; everything else passes `tint: 1–5`. Each flow takes the colour of
+the source it comes from, or of the use it goes to when it leaves a hub. Labels
+are the name over the amount; on narrow charts names wrap inside a 30% margin.
+Hovering a node highlights its flows. The hidden table lists every flow as
+From / To / Amount. There is no year axis and no rehearsal marks: draw one
+sankey per year and let a control pick the year.
+
+### Status colours
+
+`--dv-status-ok` (done, saved) and `--dv-status-error` (an error, a destructive
+action) exist so sites stop borrowing a person's ribbon for state. They are not
+entity colours and never colour a series. Both clear 4.5:1 as text on ground and
+plate in both themes (checked 2026-10-28; values in `dataviz.css`). Pair them
+with a word or an icon; colour is never the only signal.
 
 ### Rehearsal marks across the page
 
@@ -127,6 +150,16 @@ They render with ECharts' SVG renderer, and every tooltip is built with classes
 from `dataviz.css`, never `style=""`. If you write your own ECharts options, keep
 to that rule: ECharts' default tooltip formatter emits inline styles, and this
 CSP blocks them.
+
+## Changes
+
+- **0.2.0** (2026-10-28): `DV.sankey`; status tokens `--dv-status-ok` and
+  `--dv-status-error` (light and dark); `DV.theme()` also returns `statusOk` and
+  `statusError`.
+- **0.1.3**: phone score merges colliding marks and keeps lines off names and amounts.
+- **0.1.2**: phone score layout, `ageSlots`, tint ramp for non-person series.
+- **0.1.1**: pending staves on `DV.score`.
+- **0.1.0**: Full Score tokens, fonts and ECharts builders.
 
 ## Development
 

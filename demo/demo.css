@@ -19,6 +19,7 @@ section{min-width:0}
 .fig{font-weight:600;font-size:40px;line-height:1;margin:6px 0 12px}
 .fig small{font:400 14px var(--dv-font-ui);color:var(--dv-ink-2);margin-left:8px}
 
+.c-sk{height:380px}.ok{color:var(--dv-status-ok)}.err{color:var(--dv-status-error)}
 .c-surv{height:170px}.c-hist{height:150px}.c-score{height:430px}.c-fan{height:330px}
 
 .events{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border-bottom:1px solid var(--dv-rule)}
