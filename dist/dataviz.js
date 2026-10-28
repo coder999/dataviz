@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.1.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.1.1 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -31,7 +31,7 @@
     return signOf(v, +body === 0, o) + body + '%';
   }
 
-  const DV = { version: '0.1.0', fmt: { money, pct } };
+  const DV = { version: '0.1.1', fmt: { money, pct } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -311,11 +311,16 @@
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(d.series.map(s => money(s.values[i])), [money(total(i))])) });
   };
 
-  // The income score. {years, ages:[[..],[..]], staves:[{name, values, slot}], marks}
+  // The income score. {years, ages:[[..],[..]], staves:[{name, values, slot, pending?}], marks}
   // One staff per source; band thickness = amount; shared year axis with ages under each year.
+  // pending: {from, to?, label?} marks years where the source exists but its amount is not known
+  // yet; they draw as a hairline in the staff colour, labelled (default "amount pending").
   DV.score = function (el, d, o) {
     o = o || {};
     const y0 = d.years[0], y1 = d.years[d.years.length - 1], S = d.staves;
+    const pend = (s, y) => s.pending && y >= s.pending.from && y <= (s.pending.to == null ? y1 : s.pending.to);
+    const pendLabel = s => s.pending.label || 'amount pending';
+    const cellText = (s, i) => (pend(s, d.years[i]) ? pendLabel(s) : money(s.values[i]));
     const MAX = Math.max.apply(null, S.map(s => Math.max.apply(null, s.values))) || 1;
     return mount(el, t => {
       const sm = t.small, labelW = sm ? 104 : Math.min(200, Math.round(t.width * 0.2));
@@ -324,7 +329,8 @@
       return {
         grid: { left: labelW, right: sm ? 6 : 12, top: markRoom(t, d.marks), bottom: d.ages ? 40 : 26 },
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= d.years.length) return '';
-          return ttHead(y, d.ages, i) + S.map((s, k) => [s, k]).filter(([s]) => s.values[i] > 0).map(([s, k]) => ttRow(s.slot || k + 1, s.name, money(s.values[i]))).join(''); } }),
+          return ttHead(y, d.ages, i) + S.map((s, k) => [s, k]).filter(([s]) => s.values[i] > 0 || pend(s, y))
+            .map(([s, k]) => ttRow(s.slot || k + 1, s.name, s.values[i] > 0 ? money(s.values[i]) : esc(pendLabel(s)))).join(''); } }),
         xAxis: yearAxis(t, d.years, d.ages, t.width - labelW - 12),
         yAxis: { type: 'category', inverse: true, data: S.map((_, i) => String(i)), axisLine: { show: false }, axisTick: { show: false },
           splitLine: { show: true, lineStyle: { color: t.ruleSoft } },
@@ -355,15 +361,22 @@
                 kids.push({ type: 'text', style: { text: txt, x: x0 + 5, y: inside ? cy : cy - th(v) / 2 - 3, verticalAlign: inside ? 'middle' : 'bottom',
                   fill: inside ? t.onEntity : t.ink, font: `600 11px ${t.fontUi}` } });
               });
+              const p = S[i].pending;
+              if (p) {
+                const a = x(Math.max(y0, p.from)), b = x((p.to == null ? y1 : Math.min(y1, p.to)) + 1);
+                kids.push({ type: 'line', shape: { x1: a, y1: cy, x2: b, y2: cy }, style: { stroke: col, lineWidth: 1.5 } },
+                  { type: 'text', style: { text: pendLabel(S[i]), x: a + 5, y: cy - 4, verticalAlign: 'bottom', fill: t.ink2, font: `500 11px ${t.fontUi}` } });
+              }
               return { type: 'group', children: kids };
             } },
           // invisible carrier for the axis tooltip and the rehearsal marks
           Object.assign({ type: 'line', data: d.years.map(y => [y + 0.5, 0]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 }, markLayers(t, d.marks, false, 'start')),
         ],
       };
-    }, o.label || `Income score, ${y0} to ${y1}. ` + S.map(s => `${s.name}: ${runsText(d.years, s.values)}`).join('. '),
+    }, o.label || `Income score, ${y0} to ${y1}. ` + S.map(s => `${s.name}: ${runsText(d.years, s.values)}` +
+      (s.pending ? `; ${pendLabel(s)} from ${s.pending.from}` : '')).join('. '),
     { caption: o.label || `Income by source, ${y0} to ${y1}`, columns: yearCols(d.ages).concat(S.map(s => s.name)),
-      rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(S.map(s => money(s.values[i])))) });
+      rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(S.map(s => cellText(s, i)))) });
   };
 
   DV.theme = theme;

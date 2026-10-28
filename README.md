@@ -67,6 +67,14 @@ DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], ma
   generated `aria-label` and table caption.
 - `name` on a score staff may be `"Owner · Source"`. On narrow charts it wraps
   after the owner.
+- A score staff may carry `pending: { from, to, label }` for years where the
+  source exists but its amount is not known yet (`to` defaults to the last year,
+  `label` to "amount pending"). Those years draw as a hairline in the staff
+  colour with the label at the start, and read as the label in the tooltip and
+  the data table.
+- Every builder reads its colours from the chart element itself, so a site can
+  re-key a chart by redefining `--dv-entity-N` on that element (for example a
+  non-person ramp for a chart whose series are not people).
 
 ### Rehearsal marks across the page
 
