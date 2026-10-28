@@ -53,7 +53,7 @@ DV.fan(el, { years, p5, p25, p50, p75, p95, marks, ages });
 DV.stacked(el, { years, series: [{ name, values, slot }], marks, ages });
 DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], marks });
 DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
-DV.lines(el, { years, series: [{ name, values, tint }], marks, ages });
+DV.lines(el, { years, series: [{ name, values }], marks, ages });
 ```
 
 - `el` is an element or a selector. Every builder returns the ECharts instance.
@@ -85,8 +85,12 @@ DV.lines(el, { years, series: [{ name, values, tint }], marks, ages });
 - A score staff may carry `labelValues` aligned to `values`: the amount labels and where a
   new run starts follow them (for example a full-year rate) while the band thickness keeps
   `values` (the year's actual amount, thinner in a part year).
-- `DV.lines` draws several stepped lines on the shared year axis, not stacked. The first
-  series is heavier and carries the rehearsal marks.
+- `DV.lines` draws several stepped lines on the shared year axis, not stacked, for series
+  that are not people (scenarios). Series k wears `--dv-line-k` and a dash pattern (solid,
+  dashed, dotted, dash-dot), all 2px, and is labelled at its end with its name and last value.
+  Colour alone cannot separate three or more lines: no set of three can differ >= 3:1 from
+  each other while each keeps 3:1 against the ground, so the dash pattern and the end label
+  carry identity. The first series carries the rehearsal marks.
 - `DV.score` on a narrow chart (< 560px) puts each staff's name above it across
   the full plot width and keeps rehearsal letters in one row. Marks whose boxes
   would collide merge into one box (`D·E`) on the first mark's line; every line
@@ -164,6 +168,9 @@ CSP blocks them.
 
 ## Changes
 
+- **0.2.3** (2026-10-28): `DV.lines` takes its colours from new `--dv-line-1..4` tokens (hues kept
+  clear of the person ribbons, each >= 4.6:1 on ground and plate in both themes) plus a dash pattern
+  per series, one stroke weight, and names each line at its end (colliding names shift apart).
 - **0.2.2** (2026-10-28): the tint set is categorical: alternating dark and light navy,
   slate and indigo-grey, so neighbouring bands of a stack differ by at least 3:1 (light and dark);
   `DV.stacked` drops the stroke between bands and takes `yTicks`; `DV.score` staves take

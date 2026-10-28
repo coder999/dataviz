@@ -47,7 +47,7 @@
     { name: 'Cash', values: D.balances.cash, tint: 4 },
   ] });
   DV.lines('#c-lines', { years: D.years, ages, marks: D.events, yTicks: 3, series: [
-    { name: 'Plan', values: D.fan.p50, tint: 1 }, { name: 'Retire two years later', values: D.fan.p75, tint: 3 }, { name: 'Spend more', values: D.fan.p25, tint: 5 }] });
+    { name: 'Plan', values: D.fan.p50 }, { name: 'Retire two years later', values: D.fan.p75 }, { name: 'Spend more', values: D.fan.p25 }, { name: 'Spend more, retire later', values: D.fan.p25.map(v => v * 1.02) }] });
   const hub = 'This year’s money';
   DV.sankey('#c-sk', { nodes: [{ name: hub, tint: 5 }, { name: 'Alex · Pension', slot: 1 }, { name: 'Sam · Salary', slot: 2 },
     { name: 'Alex · Social Security', slot: 1 }, { name: 'Pre-tax withdrawals', tint: 1 }, { name: 'Employer match', tint: 1 }, { name: '529 withdrawals', tint: 5 }, { name: 'Taxes', tint: 2 },

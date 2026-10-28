@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.2.2 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.2.3 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -31,7 +31,7 @@
     return signOf(v, +body === 0, o) + body + '%';
   }
 
-  const DV = { version: '0.2.2', fmt: { money, pct } };
+  const DV = { version: '0.2.3', fmt: { money, pct } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -55,6 +55,7 @@
     TOKENS.forEach(k => { t[camel(k)] = cs.getPropertyValue('--dv-' + k).trim(); });
     t.entity = [1, 2, 3, 4, 5, 6].map(i => cs.getPropertyValue('--dv-entity-' + i).trim());
     t.tint = [1, 2, 3, 4, 5].map(i => cs.getPropertyValue('--dv-tint-' + i).trim());
+    t.line = [1, 2, 3, 4].map(i => cs.getPropertyValue('--dv-line-' + i).trim());
     t.surface = surfaceOf(el, t.ground);
     t.width = el.clientWidth || 600;
     t.small = t.width < 560;
@@ -423,26 +424,36 @@
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(S.map(s => cellText(s, i)))) });
   };
 
-  // Several series on one year axis as stepped lines (e.g. scenarios compared). Not stacked.
-  // {years, series:[{name, values, slot | tint}], marks, ages?, ageSlots?}. Series that are not
-  // people take tint 1-5; the first series is drawn heavier.
+  // Several non-person series on one year axis as stepped lines (e.g. scenarios compared), not stacked.
+  // {years, series:[{name, values}], marks, ages?, ageSlots?, yTicks?}. Series k takes --dv-line-k and
+  // a dash pattern (solid, dashed, dotted, dash-dot), all one weight, and is named at its line end;
+  // names that would collide are nudged apart. Marks ride on the first series.
+  const DASH = ['solid', [7, 4], [2, 3], [9, 3, 2, 3]];
   DV.lines = function (el, d, o) {
     o = o || {};
-    const y0 = d.years[0], n = d.years.length;
-    return mount(el, t => ({
-      legend: legend(t, d.series.map(s => ({ name: s.name, icon: 'rect' }))),
-      grid: { left: 8, right: t.small ? 6 : 12, top: (t.small && d.series.length > 2 ? 44 : 24) + markRoom(t, d.marks), bottom: 0, containLabel: true },
-      tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
-        return ttHead(y, d.ages, i) + d.series.map((s, k) => ttRow(keyClass(s, k), s.name, money(s.values[i]))).join(''); } }),
-      xAxis: yearAxis(t, d.years, d.ages, t.width - 60, d.ageSlots),
-      yAxis: moneyAxis(t, Object.assign({ min: 0 }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {})),
-      series: d.series.map((s, k) => Object.assign({ name: s.name, type: 'line', step: 'end', symbol: 'none', data: yearData(d.years, s.values),
-        itemStyle: { color: seriesColor(t, s, k) }, lineStyle: { color: seriesColor(t, s, k), width: k ? 1.5 : 2.5 }, z: 3 + (k ? 0 : 1) },
-      k ? {} : markLayers(t, d.marks, false))),
-    }), o.label || 'Lines by year: ' + d.series.map(s => `${s.name} ${money(s.values[0])} in ${y0}, ${money(s.values[n - 1])} in ${d.years[n - 1]}`).join('; '),
+    const y0 = d.years[0], n = d.years.length, last = s => s.values[n - 1];
+    return mount(el, t => {
+      const col = k => t.line[k % 4], endW = t.small ? 92 : 150;
+      return {
+        grid: { left: 8, right: endW, top: 6 + markRoom(t, d.marks), bottom: 0, containLabel: true },
+        tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
+          return ttHead(y, d.ages, i) + d.series.map((s, k) => ttRow('dv-line-' + (k % 4 + 1), s.name, money(s.values[i]))).join(''); } }),
+        xAxis: yearAxis(t, d.years, d.ages, t.width - 60 - endW, d.ageSlots),
+        yAxis: moneyAxis(t, Object.assign({ min: 0 }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {})),
+        // end labels: ECharts' label layout shifts colliding ones vertically
+        labelLayout: { moveOverlap: 'shiftY' },
+        series: d.series.map((s, k) => Object.assign({ name: s.name, type: 'line', step: 'end', symbol: 'none', data: yearData(d.years, s.values),
+          itemStyle: { color: col(k) }, lineStyle: { color: col(k), width: 2, type: DASH[k % 4] }, z: 4 - k % 4,
+          endLabel: { show: true, distance: 6,
+            formatter: () => `{n|${wrapName(s.name, t.small ? 13 : 22)}}\n{v|${money(last(s))}}`,
+            rich: { n: { color: t.ink, fontFamily: t.fontUi, fontSize: 11.5, lineHeight: 13 }, v: { color: t.ink2, fontFamily: t.fontFig, fontSize: 11.5, lineHeight: 13 } } } },
+        k ? {} : markLayers(t, d.marks, false))),
+      };
+    }, o.label || 'Lines by year: ' + d.series.map(s => `${s.name} ${money(s.values[0])} in ${y0}, ${money(last(s))} in ${d.years[n - 1]}`).join('; '),
     { caption: o.label || 'Lines by year', columns: yearCols(d.ages).concat(d.series.map(s => s.name)),
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(d.series.map(s => money(s.values[i])))) });
   };
+  const wrapName = (name, n) => { const out = []; String(name).split(' ').forEach(w => { const l = out.length - 1; if (l >= 0 && (out[l] + ' ' + w).length <= n) out[l] += ' ' + w; else out.push(w); }); return out.join('}\n{n|'); };
 
   // Cash flow. {nodes:[{name, slot?|tint?}], links:[{source, target, value}]}, names unique.
   // Sources (no incoming link) sit left with labels on their left, sinks right with labels on their

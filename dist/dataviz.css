@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.2.2 · "Full Score" visual system · MIT (fonts: OFL-1.1, see fonts/) */
+/*! coder999/dataviz v0.2.3 · "Full Score" visual system · MIT (fonts: OFL-1.1, see fonts/) */
 @font-face{font-family:"Bodoni Moda";src:url(fonts/bodoni-moda-latin-500-normal.woff2) format("woff2");font-weight:500;font-display:swap}
 @font-face{font-family:"Bodoni Moda";src:url(fonts/bodoni-moda-latin-700-normal.woff2) format("woff2");font-weight:700;font-display:swap}
 @font-face{font-family:"Source Serif 4";src:url(fonts/source-serif-4-latin-400-normal.woff2) format("woff2");font-weight:400;font-display:swap}
@@ -30,6 +30,10 @@
   --dv-tint-1:#2a4a7f; --dv-tint-2:#a9bde0; --dv-tint-3:#4f5867; --dv-tint-4:#d3d8e0; --dv-tint-5:#3d4466;
   /* status: done/ok and error/destructive. Never an entity colour, never a series. */
   --dv-status-ok:#2c6e3f; --dv-status-error:#b0213f;
+  /* lines for things that are not people (scenarios compared): hues kept clear of the ribbons, each
+     >= 4.6:1 on ground and plate in both themes, and a dash pattern per step (DV.lines), because three
+     or more lines cannot also differ >= 3:1 from each other while each keeps 3:1 against the ground. */
+  --dv-line-1:#1b2f55; --dv-line-2:#2f6f86; --dv-line-3:#6b6f7a; --dv-line-4:#5a4f9a;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
@@ -44,6 +48,7 @@
     --dv-on-entity:#0d1829;
     --dv-tint-1:#a4bdea; --dv-tint-2:#2f4b7c; --dv-tint-3:#c3cad6; --dv-tint-4:#4a5466; --dv-tint-5:#b3b6d6;
     --dv-status-ok:#79c48c; --dv-status-error:#f2849a;
+    --dv-line-1:#dfe7f5; --dv-line-2:#7fc0d6; --dv-line-3:#a9aebb; --dv-line-4:#b1a8e8;
   }
 }
 :root[data-theme="dark"]{
@@ -58,6 +63,7 @@
   --dv-on-entity:#0d1829;
   --dv-tint-1:#a4bdea; --dv-tint-2:#2f4b7c; --dv-tint-3:#c3cad6; --dv-tint-4:#4a5466; --dv-tint-5:#b3b6d6;
   --dv-status-ok:#79c48c; --dv-status-error:#f2849a;
+  --dv-line-1:#dfe7f5; --dv-line-2:#7fc0d6; --dv-line-3:#a9aebb; --dv-line-4:#b1a8e8;
 }
 
 ::selection{background:var(--dv-accent);color:var(--dv-on-accent)}
@@ -83,6 +89,7 @@ button.dv-rm:hover{background:var(--dv-accent-wash)}
 .dv-plate::before{content:"";width:4px;height:13px;background:var(--dv-c)}
 .dv-slot-1{--dv-c:var(--dv-entity-1)}.dv-slot-2{--dv-c:var(--dv-entity-2)}.dv-slot-3{--dv-c:var(--dv-entity-3)}
 .dv-slot-4{--dv-c:var(--dv-entity-4)}.dv-slot-5{--dv-c:var(--dv-entity-5)}.dv-slot-6{--dv-c:var(--dv-entity-6)}
+.dv-line-1{--dv-c:var(--dv-line-1)}.dv-line-2{--dv-c:var(--dv-line-2)}.dv-line-3{--dv-c:var(--dv-line-3)}.dv-line-4{--dv-c:var(--dv-line-4)}
 .dv-tint-1{--dv-c:var(--dv-tint-1)}.dv-tint-2{--dv-c:var(--dv-tint-2)}.dv-tint-3{--dv-c:var(--dv-tint-3)}.dv-tint-4{--dv-c:var(--dv-tint-4)}.dv-tint-5{--dv-c:var(--dv-tint-5)}
 
 /* chart containers (DV adds .dv-chart); figures in the SVG follow the tabular rule */
