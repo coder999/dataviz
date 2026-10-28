@@ -1,0 +1,12 @@
+{
+    "name": "coder999/dataviz",
+    "description": "Shared \"Full Score\" visual system: CSS tokens, self-hosted fonts and Apache ECharts chart builders. Static assets only.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Mark Tuttle"
+        }
+    ],
+    "require": {}
+}

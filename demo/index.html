@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dataviz demo</title>
+<link rel="stylesheet" href="../dist/dataviz.css">
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<main>
+  <header class="head">
+    <div>
+      <h1>dataviz <span class="tag">Synthetic data</span></h1>
+      <p>coder999/dataviz v0.1.0 · every chart builder, fictional household</p>
+    </div>
+    <div class="theme" role="group" aria-label="Theme">
+      <button type="button" data-theme-set="">Auto</button>
+      <button type="button" data-theme-set="light">Light</button>
+      <button type="button" data-theme-set="dark">Dark</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="s-7" aria-labelledby="h-surv">
+      <div class="dv-sh"><h2 id="h-surv">Chance the money lasts</h2><span class="dv-meta">DV.survivalStrip · by year, ages <span class="dv-plate dv-slot-1">Alex</span> · <span class="dv-plate dv-slot-2">Sam</span></span></div>
+      <div id="c-surv" class="c-surv"></div>
+    </section>
+
+    <section class="s-5" aria-labelledby="h-hist">
+      <div class="dv-sh"><h2 id="h-hist">Net worth</h2><span class="dv-meta">DV.history · quarterly</span></div>
+      <p class="fig dv-num" id="nw"></p>
+      <div id="c-hist" class="c-hist"></div>
+    </section>
+
+    <section class="s-12" aria-labelledby="h-ev">
+      <div class="dv-sh"><h2 id="h-ev">Life events</h2><span class="dv-meta">DV.marks · select a mark to read that year on every chart</span></div>
+      <div class="events" id="events"></div>
+      <p class="readout" id="readout" aria-live="polite"></p>
+    </section>
+
+    <section class="s-12" aria-labelledby="h-score">
+      <div class="dv-sh"><h2 id="h-score">Income, 2026 to 2076</h2><span class="dv-meta">DV.score · band thickness = yearly amount · beneath each year: ages <span class="dv-plate dv-slot-1">Alex</span> · <span class="dv-plate dv-slot-2">Sam</span></span></div>
+      <div id="c-score" class="c-score"></div>
+    </section>
+
+    <section class="s-7" aria-labelledby="h-fan">
+      <div class="dv-sh"><h2 id="h-fan">Investable balance</h2><span class="dv-meta">DV.fan · real 2026 dollars</span></div>
+      <div id="c-fan" class="c-fan"></div>
+    </section>
+
+    <section class="s-5" aria-labelledby="h-stk">
+      <div class="dv-sh"><h2 id="h-stk">Balances by tax treatment</h2><span class="dv-meta">DV.stacked</span></div>
+      <div id="c-stk" class="c-fan"></div>
+    </section>
+  </div>
+</main>
+<script src="../dist/echarts.min.js"></script>
+<script src="../dist/dataviz.js"></script>
+<script src="data.js"></script>
+<script src="demo.js"></script>
+</body>
+</html>
