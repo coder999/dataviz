@@ -78,9 +78,12 @@ DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], ma
   asset class) passes `tint: 1–5` instead of `slot` on `DV.stacked`: the
   `--dv-tint-N` ramp is Henle-navy tints with a neutral at 5, light and dark.
 - `DV.score` on a narrow chart (< 560px) puts each staff's name above it across
-  the full plot width and keeps rehearsal letters in one row, hiding a letter
-  that would collide with a shown one (its dashed line stays; the active mark
-  always shows). A pending label steps past any mark line it would cross.
+  the full plot width and keeps rehearsal letters in one row. Marks whose boxes
+  would collide merge into one box (`D·E`) on the first mark's line; every line
+  still draws, tapping the box selects its first mark, and it fills when any of
+  its marks is active, so give each event its own `data-dv-mark` control too.
+  The mark lines stop short of the staff names and break around the amounts.
+  A pending label steps past any mark line it would cross.
 
 ### Rehearsal marks across the page
 

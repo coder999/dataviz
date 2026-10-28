@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.1.2 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.1.3 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -31,7 +31,7 @@
     return signOf(v, +body === 0, o) + body + '%';
   }
 
-  const DV = { version: '0.1.2', fmt: { money, pct } };
+  const DV = { version: '0.1.3', fmt: { money, pct } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -149,17 +149,22 @@
     if (b) marks.toggle(b.dataset.dvMark);
   });
 
-  // gap (years): when set, labels sit in one row and a letter closer than `gap` years to a shown one
-  // is hidden (its line stays); the active mark always shows. Otherwise narrow charts stagger two tiers.
-  function markLayers(t, list, compact, pos, gap) {
+  // perYear (px per year): when set, letters keep to one row and marks whose boxes would collide
+  // merge into one box ("D·E") on the first mark's line. Every line still draws; tapping a merged
+  // box selects its first mark, and it fills when any of its marks is active. Without perYear,
+  // narrow charts stagger the letters in two tiers.
+  function markLayers(t, list, compact, pos, perYear) {
     if (!list || !list.length) return {};
     list.forEach(m => known.set(m.mark, m));
     const act = marks.active, ev = list.find(m => m.mark === act);
-    let shown = null;
-    if (gap) {
-      shown = new Set(ev ? [ev.mark] : []);
+    let lead = null; // first mark of each merged group -> its letters
+    if (perYear) {
+      lead = new Map();
+      const half = n => (n * 7 + (n - 1) * 7 + 8) / 2; // box half-width for n letters at the compact size
+      let g = null;
       list.slice().sort((a, b) => a.year - b.year).forEach(m => {
-        if (![...shown].some(k => Math.abs(known.get(k).year - m.year) < gap)) shown.add(m.mark);
+        if (g && (m.year - g[0].year) * perYear < half(g.length) + half(1) + 4) g.push(m);
+        else { g = [m]; lead.set(m.mark, g); }
       });
     }
     return {
@@ -168,11 +173,12 @@
         label: { show: true, position: pos || 'end', formatter: '{b}', fontFamily: t.fontUi, fontWeight: 700, fontSize: compact ? 10 : 12,
           borderColor: t.accent, borderWidth: 1.5, padding: compact ? [3, 4, 2, 4] : [4, 6, 3, 6] },
         data: list.map((m, j) => {
-          const on = m.mark === act;
+          const on = m.mark === act, g = lead && lead.get(m.mark), box = g ? g.some(x => x.mark === act) : on;
+          const label = { show: !lead || !!g, distance: !perYear && t.small && j % 2 ? (compact ? 17 : 21) : 3,
+            backgroundColor: box ? t.accent : t.surface, color: box ? t.onAccent : t.accent };
+          if (g && g.length > 1) label.formatter = g.map(x => x.mark).join('·');
           return { name: m.mark, xAxis: m.year,
-            lineStyle: { color: on ? t.accent : t.markLine, width: on ? 1.5 : 1, type: on ? 'solid' : [2, 3] },
-            label: { show: !shown || shown.has(m.mark), distance: !gap && t.small && j % 2 ? (compact ? 17 : 21) : 3,
-              backgroundColor: on ? t.accent : t.surface, color: on ? t.onAccent : t.accent } };
+            lineStyle: { color: on ? t.accent : t.markLine, width: on ? 1.5 : 1, type: on ? 'solid' : [2, 3] }, label };
         }),
       },
       markArea: ev ? { silent: true, itemStyle: { color: alpha(t.accent, 0.1) }, data: [[{ xAxis: ev.year }, { xAxis: ev.year + 1 }]] } : { data: [] },
@@ -328,8 +334,8 @@
 
   // The income score. {years, ages:[[..],[..]], ageSlots?, staves:[{name, values, slot, pending?}], marks}
   // One staff per source; band thickness = amount; shared year axis with ages under each year.
-  // Narrow (<560px): each staff's name sits above it across the full plot width, and the
-  // rehearsal letters keep to one row, hiding a letter that would collide (its line stays).
+  // Narrow (<560px): each staff's name sits above it across the full plot width, drawn with the
+  // amounts above the mark lines so the lines stop short of them; colliding letters merge ("D·E").
   // pending: {from, to?, label?} marks years where the source exists but its amount is not known
   // yet; they draw as a hairline in the staff colour, labelled (default "amount pending").
   DV.score = function (el, d, o) {
@@ -355,7 +361,18 @@
           axisLabel: { show: !sm, align: 'left', margin: labelW - 2, rich, formatter: (v, i) => `{k${i}|}{s|${S[i].name}}` } },
         series: [
           { type: 'custom', silent: true, z: 2, data: S.map((_, i) => [y0, i]), encode: { x: 0, y: 1 },
-            renderItem(params, api) {
+            renderItem: (params, api) => ({ type: 'group', children: parts(params, api).kids }) },
+          // narrow only: stave names and amounts drawn above the mark lines (markLine draws at z 5),
+          // on a ground-coloured strip / their own backing, so the lines stop short of them
+          ...(sm ? [{ type: 'custom', silent: true, z: 6, data: S.map((_, i) => [y0, i]), encode: { x: 0, y: 1 },
+            renderItem: (params, api) => ({ type: 'group', children: parts(params, api).over }) }] : []),
+          // invisible carrier for the axis tooltip and the rehearsal marks
+          Object.assign({ type: 'line', data: d.years.map(y => [y + 0.5, 0]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 },
+            markLayers(t, d.marks, sm, 'start', sm ? perYear : 0)),
+        ],
+      };
+      // One staff's shapes: kids under the mark lines; on narrow charts its names and labels go to `over`.
+      function parts(params, api) {
               const i = params.dataIndex, vals = S[i].values, col = slotColor(t, S[i].slot || i + 1);
               // narrow: the name takes the top of the row, the staff sits a little lower with thinner bands
               const rowH = api.size([0, 1])[1], cy = api.coord([y0, i])[1] + (sm ? rowH * 0.16 : 0), maxH = rowH * (sm ? 0.5 : 0.8);
@@ -365,10 +382,14 @@
               const kids = [
                 { type: 'line', shape: { x1: x(y0), y1: cy, x2: x(y1 + 1), y2: cy }, style: { stroke: t.staff, lineWidth: 1 } },
                 { type: 'polygon', shape: { points: top.concat(bot.reverse()) }, style: { fill: col } },
-              ];
+              ], over = [];
+              // a label: under the marks on wide charts; above them on narrow ones, backed so lines break around it
+              const lab = (style, back) => (sm ? over.push({ type: 'text', style: Object.assign(style, { backgroundColor: back, padding: [1, 2] }) })
+                : kids.push({ type: 'text', style }));
               if (sm) {
-                const ty = api.coord([y0, i])[1] - rowH / 2 + 5;
-                kids.push({ type: 'rect', shape: { x: x(y0), y: ty, width: 3, height: 11 }, style: { fill: col } },
+                const rowTop = api.coord([y0, i])[1] - rowH / 2, ty = rowTop + 5;
+                over.push({ type: 'rect', shape: { x: x(y0), y: rowTop + 1, width: x(y1 + 1) - x(y0), height: 19 }, style: { fill: t.surface } },
+                  { type: 'rect', shape: { x: x(y0), y: ty, width: 3, height: 11 }, style: { fill: col } },
                   { type: 'text', style: { text: S[i].name, x: x(y0) + 8, y: ty - 1, verticalAlign: 'top', fill: t.ink, font: `500 11.5px ${t.fontUi}` } });
               }
               // label each run where the amount steps (>1% of the score's max)
@@ -378,8 +399,8 @@
                 const room = (j + 1 < starts.length ? x(y0 + starts[j + 1]) : x(y1 + 1)) - x0;
                 if (room < w) return;
                 const inside = th(v) >= 15;
-                kids.push({ type: 'text', style: { text: txt, x: x0 + 5, y: inside ? cy : cy - th(v) / 2 - 3, verticalAlign: inside ? 'middle' : 'bottom',
-                  fill: inside ? t.onEntity : t.ink, font: `600 11px ${t.fontUi}` } });
+                lab({ text: txt, x: x0 + 5, y: inside ? cy : cy - th(v) / 2 - 3, verticalAlign: inside ? 'middle' : 'bottom',
+                  fill: inside ? t.onEntity : t.ink, font: `600 11px ${t.fontUi}` }, inside ? col : t.surface);
               });
               const p = S[i].pending;
               if (p) {
@@ -388,16 +409,11 @@
                 const txt = pendLabel(S[i]), w = txt.length * 5.9 + 6;
                 let lx = a + 5;
                 (d.marks || []).map(m => x(m.year)).sort((u, v) => u - v).forEach(mx => { if (mx > lx - 3 && mx < lx + w && mx + 5 + w <= b) lx = mx + 5; });
-                kids.push({ type: 'line', shape: { x1: a, y1: cy, x2: b, y2: cy }, style: { stroke: col, lineWidth: 1.5 } },
-                  { type: 'text', style: { text: txt, x: lx, y: cy - 4, verticalAlign: 'bottom', fill: t.ink2, font: `500 11px ${t.fontUi}` } });
+                kids.push({ type: 'line', shape: { x1: a, y1: cy, x2: b, y2: cy }, style: { stroke: col, lineWidth: 1.5 } });
+                lab({ text: txt, x: lx, y: cy - 4, verticalAlign: 'bottom', fill: t.ink2, font: `500 11px ${t.fontUi}` }, t.surface);
               }
-              return { type: 'group', children: kids };
-            } },
-          // invisible carrier for the axis tooltip and the rehearsal marks
-          Object.assign({ type: 'line', data: d.years.map(y => [y + 0.5, 0]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 },
-            markLayers(t, d.marks, sm, 'start', sm ? Math.ceil(22 / perYear) : 0)),
-        ],
-      };
+              return { kids, over };
+      }
     }, o.label || `Income score, ${y0} to ${y1}. ` + S.map(s => `${s.name}: ${runsText(d.years, s.values)}` +
       (s.pending ? `; ${pendLabel(s)} from ${s.pending.from}` : '')).join('. '),
     { caption: o.label || `Income by source, ${y0} to ${y1}`, columns: yearCols(d.ages).concat(S.map(s => s.name)),
