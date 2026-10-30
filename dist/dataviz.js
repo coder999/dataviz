@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.2.3 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.3.0 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -31,7 +31,27 @@
     return signOf(v, +body === 0, o) + body + '%';
   }
 
-  const DV = { version: '0.2.3', fmt: { money, pct } };
+  // 12,308 (default), 12k / 1.2k / 2.5M ({compact}), +5 / −5 / ±0 ({sign})
+  function count(v, o) {
+    o = o || {};
+    if (v == null || !isFinite(v)) return '—';
+    const a = Math.abs(v), one = x => x.toFixed(1).replace(/\.0$/, '');
+    let body;
+    if (!o.compact) body = Math.round(a).toLocaleString('en-US');
+    else if (a < 999.5) body = String(Math.round(a));
+    else if (a < 9999.5) body = one(a / 1e3) + 'k';
+    else if (a < 999500) body = Math.round(a / 1e3) + 'k';
+    else if (a < 9.9995e6) body = one(a / 1e6) + 'M';
+    else body = Math.round(a / 1e6) + 'M';
+    return signOf(v, body === '0', o) + body;
+  }
+
+  // '2026-10-03' -> 'Oct 3'. Read as UTC so no viewer timezone moves it a day.
+  function day(iso) {
+    return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  }
+
+  const DV = { version: '0.3.0', fmt: { money, pct, count, day } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -454,6 +474,41 @@
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(d.series.map(s => money(s.values[i])))) });
   };
   const wrapName = (name, n) => { const out = []; String(name).split(' ').forEach(w => { const l = out.length - 1; if (l >= 0 && (out[l] + ' ' + w).length <= n) out[l] += ' ' + w; else out.push(w); }); return out.join('}\n{n|'); };
+
+  // Day-by-day counts (visitors, sign-ins): {dates:['2026-10-03', …], series:[{name, values}],
+  // band?:{lo:[], hi:[], name?}, yTicks?}. One series without a band draws as a filled area; otherwise lines
+  // in --dv-line-k with DV.lines' dash patterns and a legend. band shades a normal range behind the
+  // data (default name "Normal range"). Values are counts, formatted with DV.fmt.count.
+  DV.daily = function (el, d, o) {
+    o = o || {};
+    const n = d.dates.length, labels = d.dates.map(day), solo = d.series.length === 1;
+    const b = d.band, bandName = b && (b.name || 'Normal range');
+    return mount(el, t => {
+      const col = k => t.line[k % 4], series = [];
+      if (b) { // stacked pair: an invisible floor at lo, then the range (hi − lo) filled on top of it
+        const quiet = { type: 'line', stack: 'dv-band', silent: true, symbol: 'none', lineStyle: { opacity: 0 }, z: 1 };
+        series.push(Object.assign({ name: 'dv-band-floor', data: b.lo }, quiet),
+          Object.assign({ name: bandName, data: b.hi.map((h, i) => h - b.lo[i]), areaStyle: { color: alpha(t.ink3, 0.14) } }, quiet));
+      }
+      d.series.forEach((s, k) => series.push({ name: s.name, type: 'line', symbol: 'none', data: s.values, z: 4 - k % 4,
+        itemStyle: { color: col(k) }, lineStyle: { color: col(k), width: 2, type: DASH[k % 4] },
+        areaStyle: solo && !b ? { color: alpha(col(k), 0.12) } : undefined }));
+      return {
+        grid: { left: 8, right: 12, top: solo ? 12 : 34, bottom: 0, containLabel: true },
+        legend: solo ? { show: false } : legend(t, d.series.map(s => s.name)),
+        tooltip: Object.assign(tip(t), { formatter: ps => { const i = ps[0].dataIndex;
+          return `<b>${esc(labels[i])}</b>` + d.series.map((s, k) => ttRow('dv-line-' + (k % 4 + 1), s.name, count(s.values[i]))).join('') +
+            (b ? ttRow('dv-band', bandName, `${count(b.lo[i])}–${count(b.hi[i])}`) : ''); } }),
+        xAxis: { type: 'category', boundaryGap: false, data: labels, axisLine: { lineStyle: { color: t.ink } }, axisTick: { show: false },
+          axisLabel: { color: t.ink, fontSize: 11, hideOverlap: true } },
+        yAxis: Object.assign({ type: 'value', min: 0, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: t.ruleSoft } },
+          axisLabel: { formatter: v => count(v, { compact: true }), color: t.ink2, fontSize: 11, fontFamily: t.fontUi } }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {}),
+        series,
+      };
+    }, o.label || 'Daily: ' + d.series.map(s => `${s.name} ${count(s.values[0])} on ${labels[0]}, ${count(s.values[n - 1])} on ${labels[n - 1]}`).join('; '),
+    { caption: o.label || 'Daily', columns: ['Date'].concat(d.series.map(s => s.name), b ? [bandName] : []),
+      rows: labels.map((l, i) => [l].concat(d.series.map(s => count(s.values[i])), b ? [`${count(b.lo[i])}–${count(b.hi[i])}`] : [])) });
+  };
 
   // Cash flow. {nodes:[{name, slot?|tint?}], links:[{source, target, value}]}, names unique.
   // Sources (no incoming link) sit left with labels on their left, sinks right with labels on their

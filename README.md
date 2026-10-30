@@ -54,6 +54,7 @@ DV.stacked(el, { years, series: [{ name, values, slot }], marks, ages });
 DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], marks });
 DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
 DV.lines(el, { years, series: [{ name, values }], marks, ages });
+DV.daily(el, { dates: ['2026-10-03', …], series: [{ name, values }], band: { lo, hi } });
 ```
 
 - `el` is an element or a selector. Every builder returns the ECharts instance.
@@ -81,7 +82,7 @@ DV.lines(el, { years, series: [{ name, values }], marks, ages });
   dark and light (odd steps dark on the light theme, light on the dark one), so in a
   stack of tints 1, 2, 3, 4, 5 any two neighbours differ by at least 3:1; steps two
   apart differ by hue. For lines on the ground use the odd steps (1, 3, 5).
-- `yTicks` (DV.stacked, DV.lines): about that many value-axis ticks, e.g. 3 for $0 / $5M / $10M.
+- `yTicks` (DV.stacked, DV.lines, DV.daily): about that many value-axis ticks, e.g. 3 for $0 / $5M / $10M.
 - A score staff may carry `labelValues` aligned to `values`: the amount labels and where a
   new run starts follow them (for example a full-year rate) while the band thickness keeps
   `values` (the year's actual amount, thinner in a part year).
@@ -144,11 +145,23 @@ Text contrast (WCAG AA) and chart-mark contrast (3:1) for every token, against
 both `--dv-ground` and `--dv-plate`, were checked on 2026-10-28. Re-check if you
 change a value.
 
+### Daily counts
+
+`DV.daily` is the one builder on a day axis rather than a year axis, for counts such as
+site visitors. `dates` are ISO days (`'2026-10-03'`), shown as `Oct 3` in UTC so no viewer's
+timezone moves a day. One series without a band draws as a filled area. Several series draw
+as lines in `--dv-line-k` with the `DV.lines` dash patterns and a legend. `band: { lo, hi,
+name? }` shades a normal range behind the data (named "Normal range" by default; its tooltip
+key uses `.dv-band`). With a band, every series draws as a line so the band stays readable.
+Values format with `DV.fmt.count`. There are no rehearsal marks and no ages.
+
 ### Formatters
 
 `DV.fmt.money(v, { trim, full, sign })` returns `$2.76M`, `$412k`, `$950`,
 `$2.5M` (with `trim`), `$2,759,750` (with `full`), or `+$92k` / `−$8k` (with
 `sign`). `DV.fmt.pct(v, { digits, sign })` returns `87%`.
+`DV.fmt.count(v, { compact, sign })` returns `12,308`, or `950` / `1.2k` / `12k` / `2.5M`
+with `compact` (never `1000` or `1000k`). `DV.fmt.day('2026-10-03')` returns `Oct 3`.
 
 ### Accessibility
 
@@ -168,6 +181,8 @@ CSP blocks them.
 
 ## Changes
 
+- **0.3.0** (2026-10-30): `DV.daily`, a day-axis chart for counts with an optional
+  normal-range band; formatters `DV.fmt.count` and `DV.fmt.day`; `.dv-band` tooltip key.
 - **0.2.3** (2026-10-28): `DV.lines` takes its colours from new `--dv-line-1..4` tokens (hues kept
   clear of the person ribbons, each >= 4.6:1 on ground and plate in both themes) plus a dash pattern
   per series, one stroke weight, and names each line at its end (colliding names shift apart).

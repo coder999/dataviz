@@ -56,5 +56,13 @@
     { source: 'Alex · Social Security', target: hub, value: 14000 }, { source: 'Pre-tax withdrawals', target: hub, value: 40000 },
     { source: 'Employer match', target: hub, value: 9000 }, { source: '529 withdrawals', target: hub, value: 6000 },
     { source: hub, target: 'Taxes', value: 62000 }, { source: hub, target: 'Spending', value: 190000 }, { source: hub, target: 'Saved', value: 37000 }] });
+  // 28 fictional days ending 30 Oct 2026: weekday traffic, weekend dips, a slow fall in the last week
+  const dates = Array.from({ length: 28 }, (_, i) => new Date(Date.UTC(2026, 9, 3 + i)).toISOString().slice(0, 10));
+  const visits = (base, drift) => dates.map((_, i) => Math.round(base * ((i % 7 === 2 || i % 7 === 3) ? 0.74 : 1) * (1 + 0.08 * Math.sin(i * 1.7)) * (i > 20 ? 1 - drift * (i - 20) : 1)));
+  const blog = visits(64, 0.05);
+  DV.daily('#c-day', { dates, yTicks: 3, series: [{ name: 'Visitors', values: blog }],
+    band: { lo: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 38 : 52), hi: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 58 : 76) } });
+  DV.daily('#c-day2', { dates, yTicks: 3, series: [
+    { name: 'Family blog', values: blog }, { name: 'Recipe site', values: visits(41, 0) }, { name: 'Photo archive', values: visits(18, 0) }] });
   DV.marks.set('B');
 })();

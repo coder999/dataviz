@@ -1,7 +1,7 @@
 // node test/format.test.js — exits non-zero on the first failure
 const assert = require('assert');
 const { fmt } = require('../dist/dataviz.js');
-const { money, pct } = fmt;
+const { money, pct, count, day } = fmt;
 const M = '−';
 
 const cases = [
@@ -32,6 +32,24 @@ const cases = [
   [pct(-8, { sign: true }), M + '8%'],
   [pct(0.2, { sign: true }), '±0%'],
   [pct(undefined), '—'],
+  [count(12308), '12,308'],
+  [count(0), '0'],
+  [count(-5), M + '5'],
+  [count(5, { sign: true }), '+5'],
+  [count(0, { sign: true }), '±0'],
+  [count(950, { compact: true }), '950'],
+  [count(999.6, { compact: true }), '1k'],     // never "1000"
+  [count(1000, { compact: true }), '1k'],
+  [count(1234, { compact: true }), '1.2k'],
+  [count(12308, { compact: true }), '12k'],
+  [count(999499, { compact: true }), '999k'],
+  [count(999500, { compact: true }), '1M'],    // never "1000k"
+  [count(2.46e6, { compact: true }), '2.5M'],
+  [count(12.3e6, { compact: true }), '12M'],
+  [count(null), '—'],
+  [day('2026-10-03'), 'Oct 3'],
+  [day('2026-12-31'), 'Dec 31'],                // UTC: no timezone can shift it a day
+  [day('2027-01-01'), 'Jan 1'],
 ];
 cases.forEach(([got, want], i) => assert.strictEqual(got, want, `case ${i}: got ${got}, want ${want}`));
 console.log(`ok ${cases.length} formatter cases`);

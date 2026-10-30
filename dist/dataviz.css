@@ -90,6 +90,7 @@ button.dv-rm:hover{background:var(--dv-accent-wash)}
 .dv-slot-1{--dv-c:var(--dv-entity-1)}.dv-slot-2{--dv-c:var(--dv-entity-2)}.dv-slot-3{--dv-c:var(--dv-entity-3)}
 .dv-slot-4{--dv-c:var(--dv-entity-4)}.dv-slot-5{--dv-c:var(--dv-entity-5)}.dv-slot-6{--dv-c:var(--dv-entity-6)}
 .dv-line-1{--dv-c:var(--dv-line-1)}.dv-line-2{--dv-c:var(--dv-line-2)}.dv-line-3{--dv-c:var(--dv-line-3)}.dv-line-4{--dv-c:var(--dv-line-4)}
+.dv-band{--dv-c:var(--dv-rule)}
 .dv-tint-1{--dv-c:var(--dv-tint-1)}.dv-tint-2{--dv-c:var(--dv-tint-2)}.dv-tint-3{--dv-c:var(--dv-tint-3)}.dv-tint-4{--dv-c:var(--dv-tint-4)}.dv-tint-5{--dv-c:var(--dv-tint-5)}
 
 /* chart containers (DV adds .dv-chart); figures in the SVG follow the tabular rule */
