@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.3.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.4.0 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -51,7 +51,7 @@
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  const DV = { version: '0.3.0', fmt: { money, pct, count, day } };
+  const DV = { version: '0.4.0', fmt: { money, pct, count, day } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -202,7 +202,8 @@
             lineStyle: { color: on ? t.accent : t.markLine, width: on ? 1.5 : 1, type: on ? 'solid' : [2, 3] }, label };
         }),
       },
-      markArea: ev ? { silent: true, itemStyle: { color: alpha(t.accent, 0.1) }, data: [[{ xAxis: ev.year }, { xAxis: ev.year + 1 }]] } : { data: [] },
+      // the selected year: an ink hairline frame, never a fill, so it cannot read as one more series
+      markArea: ev ? { silent: true, itemStyle: { color: 'rgba(0,0,0,0)', borderColor: t.ink, borderWidth: 1 }, data: [[{ xAxis: ev.year }, { xAxis: ev.year + 1 }]] } : { data: [] },
     };
   }
   const markRoom = (t, list, oneRow) => (list && list.length ? (t.small && !oneRow ? 46 : 30) : 10);
@@ -252,6 +253,13 @@
         years.forEach((y, i) => { top.push(api.coord([y, hi[i]]), api.coord([y + 1, hi[i]])); bot.push(api.coord([y, lo[i]]), api.coord([y + 1, lo[i]])); });
         return { type: 'polygon', shape: { points: top.concat(bot.reverse()) }, style };
       } };
+  }
+  // height the legend takes once it wraps at this width (12px labels, 14px key, 16px gaps), so the
+  // marks lane always starts below its last line
+  function legendRoom(t, names) {
+    let rows = 1, x = 0;
+    names.forEach(n => { const w = 14 + 5 + String(n).length * 6.6; if (x && x + w > t.width) { rows++; x = 0; } x += w + 16; });
+    return rows * 20 + 4;
   }
   const legend = (t, data) => ({ top: 0, left: 0, itemWidth: 14, itemHeight: 10, itemGap: 16, selectedMode: false, data,
     textStyle: { color: t.ink2, fontSize: 12, fontFamily: t.fontUi } });
@@ -339,7 +347,7 @@
     d.series.forEach((s, k) => cum.push(cum[k].map((v, i) => v + (s.values[i] || 0))));
     return mount(el, t => ({
       legend: legend(t, d.series.map(s => ({ name: s.name, icon: 'rect' }))),
-      grid: { left: 8, right: t.small ? 6 : 12, top: (t.small && d.series.length > 3 ? 44 : 24) + markRoom(t, d.marks), bottom: 0, containLabel: true },
+      grid: { left: 8, right: t.small ? 6 : 12, top: legendRoom(t, d.series.map(s => s.name)) + markRoom(t, d.marks), bottom: 0, containLabel: true },
       tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
         return ttHead(y, d.ages, i) + d.series.map((s, k) => [s, k]).reverse().map(([s, k]) => ttRow(keyClass(s, k), s.name, money(s.values[i]))).join('') +
           `<div class="dv-tt-row">Total<span class="dv-num">${money(total(i))}</span></div>`; } }),
@@ -354,7 +362,8 @@
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(d.series.map(s => money(s.values[i])), [money(total(i))])) });
   };
 
-  // The income score. {years, ages:[[..],[..]], ageSlots?, staves:[{name, values, slot, pending?}], marks}
+  // The income score. {years, ages:[[..],[..]], ageSlots?, staves:[{name, values, slot | tint, pending?}], marks}
+  // A staff with `tint` (not a person: e.g. a tax) takes --dv-tint-N instead of a person's ribbon.
   // One staff per source; band thickness = amount; shared year axis with ages under each year.
   // Narrow (<560px): each staff's name sits above it across the full plot width, drawn with the
   // amounts above the mark lines so the lines stop short of them; colliding letters merge ("D·E").
@@ -371,7 +380,8 @@
       const sm = t.small, labelW = sm ? 6 : Math.min(200, Math.round(t.width * 0.2));
       const plotW = t.width - labelW - (sm ? 6 : 12), perYear = plotW / d.years.length;
       const rich = { s: { color: t.ink, fontFamily: t.fontUi, fontSize: sm ? 11.5 : 13, lineHeight: 15, padding: [0, 0, 0, 8] } };
-      S.forEach((s, i) => { rich['k' + i] = { width: 4, height: 14, backgroundColor: slotColor(t, s.slot || i + 1) }; });
+      const staffColor = s => (s.tint ? t.tint[(s.tint - 1) % 5] : slotColor(t, s.slot));
+      S.forEach((s, i) => { rich['k' + i] = { width: 4, height: 14, backgroundColor: s.tint || s.slot ? staffColor(s) : slotColor(t, i + 1) }; });
       return {
         grid: { left: labelW, right: sm ? 6 : 12, top: markRoom(t, d.marks, sm), bottom: d.ages ? 40 : 26 },
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= d.years.length) return '';
@@ -395,7 +405,7 @@
       };
       // One staff's shapes: kids under the mark lines; on narrow charts its names and labels go to `over`.
       function parts(params, api) {
-              const i = params.dataIndex, vals = S[i].values, col = slotColor(t, S[i].slot || i + 1);
+              const i = params.dataIndex, vals = S[i].values, col = S[i].tint || S[i].slot ? staffColor(S[i]) : slotColor(t, i + 1);
               // narrow: the name takes the top of the row, the staff sits a little lower with thinner bands
               const rowH = api.size([0, 1])[1], cy = api.coord([y0, i])[1] + (sm ? rowH * 0.16 : 0), maxH = rowH * (sm ? 0.5 : 0.8);
               const th = v => (v <= 0 ? 0 : Math.max(2, v / MAX * maxH)), x = y => api.coord([y, i])[0];

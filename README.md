@@ -181,6 +181,10 @@ CSP blocks them.
 
 ## Changes
 
+- **0.4.0** (2026-11-06): `DV.score` staves take `tint` as well as `slot` (non-person staves such as
+  taxes); `DV.stacked` sizes its top margin to the wrapped legend so the marks lane never overlaps it;
+  the selected rehearsal-mark year is an ink hairline frame instead of an accent wash, so it cannot
+  read as a series.
 - **0.3.0** (2026-10-30): `DV.daily`, a day-axis chart for counts with an optional
   normal-range band; formatters `DV.fmt.count` and `DV.fmt.day`; `.dv-band` tooltip key.
 - **0.2.3** (2026-10-28): `DV.lines` takes its colours from new `--dv-line-1..4` tokens (hues kept
