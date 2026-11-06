@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.4.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.5.0 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -51,7 +51,7 @@
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  const DV = { version: '0.4.0', fmt: { money, pct, count, day } };
+  const DV = { version: '0.5.0', fmt: { money, pct, count, day } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -314,29 +314,39 @@
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat([pct(d.pct[i])])) });
   };
 
-  // {years, p5, p25, p50, p75, p95, marks, ages?}
+  // Percentile fan: {years, p5, p25, p50, p75, p95, marks, ages?, ageSlots?, tint?, line?, yTicks?}.
+  // Nested bands 5th–95th and 25th–75th with the median line over them, in one colour: a person's
+  // ribbon ({slot} in the third argument, default 3) or, for a series that is not a person, d.tint (1-5,
+  // use an odd step so the median reads on the ground). line: {name, values} overlays one more stepped
+  // line (e.g. the single deterministic path) in --dv-line-2, dashed, so it never reads as a percentile.
   DV.fan = function (el, d, o) {
     o = o || {};
-    const y0 = d.years[0], n = d.years.length;
+    const y0 = d.years[0], n = d.years.length, ln = d.line;
     const names = ['5th–95th percentile', '25th–75th', 'Median'];
     return mount(el, t => {
-      const c = slotColor(t, o.slot || 3);
+      const c = d.tint ? t.tint[(d.tint - 1) % 5] : slotColor(t, o.slot || 3), lc = t.line[1];
       const band = (name, lo, hi, op) => stepBand(name, d.years, lo, hi, { fill: alpha(c, op) });
+      const items = [{ name: names[0], icon: 'rect' }, { name: names[1], icon: 'rect' }, { name: names[2] }].concat(ln ? [{ name: ln.name }] : []);
+      const series = [band(names[0], d.p5, d.p95, 0.16), band(names[1], d.p25, d.p75, 0.3),
+        Object.assign({ name: names[2], type: 'line', data: yearData(d.years, d.p50), step: 'end', symbol: 'none', z: 4,
+          itemStyle: { color: c }, lineStyle: { color: c, width: 2 } }, markLayers(t, d.marks, false))];
+      if (ln) series.push({ name: ln.name, type: 'line', data: yearData(d.years, ln.values), step: 'end', symbol: 'none', z: 5,
+        itemStyle: { color: lc }, lineStyle: { color: lc, width: 2, type: DASH[1] } });
       return {
-        legend: legend(t, [{ name: names[0], icon: 'rect' }, { name: names[1], icon: 'rect' }, { name: names[2] }]),
-        grid: { left: 8, right: t.small ? 6 : 12, top: 24 + markRoom(t, d.marks), bottom: 0, containLabel: true },
+        legend: legend(t, items),
+        grid: { left: 8, right: t.small ? 6 : 12, top: legendRoom(t, items.map(x => x.name)) + markRoom(t, d.marks), bottom: 0, containLabel: true },
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
           const r = (a, b) => `<span class="dv-num">${money(a)} – ${money(b)}</span>`;
-          return `${ttHead(y, d.ages, i)}<br>Median <b class="dv-num">${money(d.p50[i])}</b><br>25th–75th ${r(d.p25[i], d.p75[i])}<br>5th–95th ${r(d.p5[i], d.p95[i])}`; } }),
+          return `${ttHead(y, d.ages, i)}<br>Median <b class="dv-num">${money(d.p50[i])}</b><br>25th–75th ${r(d.p25[i], d.p75[i])}<br>5th–95th ${r(d.p5[i], d.p95[i])}` +
+            (ln ? ttRow('dv-line-2', ln.name, money(ln.values[i])) : ''); } }),
         xAxis: yearAxis(t, d.years, d.ages, t.width - 60, d.ageSlots),
-        yAxis: moneyAxis(t),
-        series: [band(names[0], d.p5, d.p95, 0.16), band(names[1], d.p25, d.p75, 0.3),
-          Object.assign({ name: names[2], type: 'line', data: yearData(d.years, d.p50), step: 'end', symbol: 'none', z: 4,
-            itemStyle: { color: c }, lineStyle: { color: c, width: 2 } }, markLayers(t, d.marks, false))],
+        yAxis: moneyAxis(t, Object.assign({ min: 0 }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {})),
+        series,
       };
-    }, o.label || `Projected balance, 5th to 95th percentile: median ${money(d.p50[0])} in ${y0}, ${money(d.p50[n - 1])} in ${d.years[n - 1]}`,
-    { caption: o.label || 'Projected balance by percentile', columns: yearCols(d.ages).concat(['5th', '25th', 'Median', '75th', '95th']),
-      rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat([d.p5[i], d.p25[i], d.p50[i], d.p75[i], d.p95[i]].map(v => money(v)))) });
+    }, o.label || `Projected balance, 5th to 95th percentile: median ${money(d.p50[0])} in ${y0}, ${money(d.p50[n - 1])} in ${d.years[n - 1]}` +
+      (ln ? `; ${ln.name} ${money(ln.values[n - 1])} in ${d.years[n - 1]}` : ''),
+    { caption: o.label || 'Projected balance by percentile', columns: yearCols(d.ages).concat(['5th', '25th', 'Median', '75th', '95th'], ln ? [ln.name] : []),
+      rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat([d.p5[i], d.p25[i], d.p50[i], d.p75[i], d.p95[i]].concat(ln ? [ln.values[i]] : []).map(v => money(v)))) });
   };
 
   // {years, series:[{name, values, slot}], marks, ages?}

@@ -49,7 +49,7 @@ Give each chart container a height in your own CSS, then:
 ```js
 DV.history(el, [{ date: '2019-03-01', value: 690000, label: '2019 Q1' }, …]);
 DV.survivalStrip(el, { years, pct, marks, ages });
-DV.fan(el, { years, p5, p25, p50, p75, p95, marks, ages });
+DV.fan(el, { years, p5, p25, p50, p75, p95, marks, ages, tint, line: { name, values } });
 DV.stacked(el, { years, series: [{ name, values, slot }], marks, ages });
 DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], marks });
 DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
@@ -66,6 +66,12 @@ DV.daily(el, { dates: ['2026-10-03', …], series: [{ name, values }], band: { l
   letters.
 - `slot` (1–6) selects `--dv-entity-N`. `fan` and `survivalStrip` take
   `{ slot }` as a third argument and default to 3.
+- `DV.fan` draws nested 5th–95th and 25th–75th percentile bands with the median over them.
+  A fan that is not a person (a household's investable money) passes `tint: 1–5` in the data
+  instead (use an odd step, so the median line reads on the ground). `line: { name, values }`
+  overlays one more stepped line, such as the single deterministic projection, in
+  `--dv-line-2` and dashed, with its own legend entry, tooltip row and table column. The value
+  axis starts at 0; `yTicks` works as on `DV.stacked`.
 - Every builder accepts `{ label }` in its third argument to override the
   generated `aria-label` and table caption.
 - `name` on a score staff may be `"Owner · Source"`. On narrow charts it wraps
@@ -181,6 +187,9 @@ CSP blocks them.
 
 ## Changes
 
+- **0.5.0** (2026-11-06): `DV.fan` takes `tint` (non-person fans), `line` (an overlaid dashed
+  line such as the deterministic path, in the legend, tooltip and data table) and `yTicks`; its value
+  axis starts at 0 and its top margin follows the wrapped legend like `DV.stacked`.
 - **0.4.0** (2026-11-06): `DV.score` staves take `tint` as well as `slot` (non-person staves such as
   taxes); `DV.stacked` sizes its top margin to the wrapped legend so the marks lane never overlaps it;
   the selected rehearsal-mark year is an ink hairline frame instead of an accent wash, so it cannot
