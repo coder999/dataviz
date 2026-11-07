@@ -193,6 +193,8 @@ as lines in `--dv-line-k` with the `DV.lines` dash patterns and a legend. `band:
 name? }` shades a normal range behind the data (named "Normal range" by default; its tooltip
 key uses `.dv-band`). With a band, every series draws as a line so the band stays readable.
 Values format with `DV.fmt.count`. There are no rehearsal marks and no ages.
+`labels` (optional, aligned to `dates`) replaces the generated `Oct 3` text on the axis, in the
+tooltip and in the data table, for series that are not daily (monthly counts: `Oct ’26`).
 
 ### Formatters
 
@@ -220,6 +222,7 @@ CSP blocks them.
 
 ## Changes
 
+- **0.6.2** (2026-11-07): `DV.daily` takes `labels`, so monthly counts can use it without reading as days.
 - **0.5.4** (2026-11-07): a score label goes inside its band only when the band's own run is wide enough for it; a one-year spike followed by zeros is labeled above it, not cut off.
 - **0.5.3** (2026-11-07): the fan's "continues to" label rounds to two significant figures ($39M, not $39.19M): a 95th percentile of 1,000 futures is not that precise.
 - **0.5.2** (2026-11-07): `DV.fan`'s overlaid line sits on a surface-coloured casing so its dashes stay

@@ -538,12 +538,12 @@
   const wrapName = (name, n) => { const out = []; String(name).split(' ').forEach(w => { const l = out.length - 1; if (l >= 0 && (out[l] + ' ' + w).length <= n) out[l] += ' ' + w; else out.push(w); }); return out.join('}\n{n|'); };
 
   // Day-by-day counts (visitors, sign-ins): {dates:['2026-10-03', …], series:[{name, values}],
-  // band?:{lo:[], hi:[], name?}, yTicks?}. One series without a band draws as a filled area; otherwise lines
+  // band?:{lo:[], hi:[], name?}, yTicks?, labels?}. labels replaces the 'Oct 3' axis text (e.g. monthly 'Oct ’26'). One series without a band draws as a filled area; otherwise lines
   // in --dv-line-k with DV.lines' dash patterns and a legend. band shades a normal range behind the
   // data (default name "Normal range"). Values are counts, formatted with DV.fmt.count.
   DV.daily = function (el, d, o) {
     o = o || {};
-    const n = d.dates.length, labels = d.dates.map(day), solo = d.series.length === 1;
+    const n = d.dates.length, labels = d.labels || d.dates.map(day), solo = d.series.length === 1;
     const b = d.band, bandName = b && (b.name || 'Normal range');
     return mount(el, t => {
       const col = k => t.line[k % 4], series = [];
