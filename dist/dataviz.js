@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.5.2 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.5.3 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -51,7 +51,7 @@
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  const DV = { version: '0.5.2', fmt: { money, pct, count, day } };
+  const DV = { version: '0.5.3', fmt: { money, pct, count, day } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -354,7 +354,7 @@
         legend: Object.assign(legend(t, items), { itemWidth: 26 }),
         grid: { left: 8, right: t.small ? 6 : 12, top, bottom: 0, containLabel: true },
         graphic: capped ? [{ type: 'text', right: t.small ? 8 : 14, top: top + 4, silent: true, z: 10,
-          style: { text: `5th–95th continues to ${money(top95.v, { trim: true })} by ${d.years[top95.i]}`, fill: t.ink2,
+          style: { text: `5th–95th continues to ${money(Number(top95.v.toPrecision(2)), { trim: true })} by ${d.years[top95.i]}`, fill: t.ink2,
             font: `500 11px ${t.fontUi}`, backgroundColor: t.surface, padding: [2, 4] } }] : [],
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
           const r = (a, b) => `<span class="dv-num">${money(a)} – ${money(b)}</span>`;
