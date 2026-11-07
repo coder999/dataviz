@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.5.1 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.5.2 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -51,7 +51,7 @@
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  const DV = { version: '0.5.1', fmt: { money, pct, count, day } };
+  const DV = { version: '0.5.2', fmt: { money, pct, count, day } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -344,7 +344,10 @@
       const series = [band(names[0], d.p5, d.p95, 0.16), band(names[1], d.p25, d.p75, 0.3),
         Object.assign({ name: names[2], type: 'line', data: yearData(d.years, clip(d.p50)), step: 'end', symbol: 'none', z: 4,
           itemStyle: { color: c }, lineStyle: { color: c, width: 2 } }, markLayers(t, d.marks, false, null, perYear))];
-      if (ln) series.push({ name: ln.name, type: 'line', data: yearData(d.years, clip(ln.values)), step: 'end', symbol: 'none', z: 6,
+      // the overlaid line rides on a 4px casing in the chart's surface colour, so its dashes stay legible where
+      // it crosses the median and the bands (an engraver's white line, not a glow)
+      if (ln) series.push({ type: 'line', data: yearData(d.years, clip(ln.values)), step: 'end', symbol: 'none', z: 5, silent: true,
+        lineStyle: { color: t.surface, width: 5 } }, { name: ln.name, type: 'line', data: yearData(d.years, clip(ln.values)), step: 'end', symbol: 'none', z: 6,
         itemStyle: { color: lc }, lineStyle: { color: lc, width: 2, type: dash } });
       const capped = top95.v > cap;
       return {
