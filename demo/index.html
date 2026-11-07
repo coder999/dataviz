@@ -12,7 +12,7 @@
   <header class="head">
     <div>
       <h1>dataviz <span class="tag">Synthetic data</span></h1>
-      <p>coder999/dataviz v0.2.2 · every chart builder, fictional household</p>
+      <p>coder999/dataviz v0.6.0 · every chart builder, fictional household</p>
     </div>
     <div class="theme" role="group" aria-label="Theme">
       <button type="button" data-theme-set="">Auto</button>
@@ -67,6 +67,18 @@
     <section class="s-12" aria-labelledby="h-day2">
       <div class="dv-sh"><h2 id="h-day2">Visitors by site</h2><span class="dv-meta">DV.daily · several series</span></div>
       <div id="c-day2" class="c-day"></div>
+    </section>
+
+    <section class="s-7" aria-labelledby="h-live">
+      <div class="dv-sh"><h2 id="h-live">Server CPU, live</h2><span class="dv-meta">DV.live · a point every 2 s · the window slides</span></div>
+      <p class="fig dv-num" id="cpuNow"></p>
+      <div id="c-live" class="c-live"></div>
+    </section>
+
+    <section class="s-5" aria-labelledby="h-net">
+      <div class="dv-sh"><h2 id="h-net">Network, live</h2><span class="dv-meta">DV.live · a point every 30 s, held flat to now · compact sparkline</span></div>
+      <div id="c-spark" class="c-spark"></div>
+      <div id="c-net" class="c-net"></div>
     </section>
 
     <section class="s-12" aria-labelledby="h-sk">

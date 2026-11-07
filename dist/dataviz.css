@@ -95,6 +95,7 @@ button.dv-rm:hover{background:var(--dv-accent-wash)}
 
 /* chart containers (DV adds .dv-chart); figures in the SVG follow the tabular rule */
 .dv-chart{width:100%;min-height:120px;position:relative}
+.dv-chart.dv-compact{min-height:0} /* DV.live sparklines are sized by their container */
 .dv-chart svg text{font-variant-numeric:lining-nums tabular-nums}
 .dv-tt{font:12px/1.5 var(--dv-font-ui);color:var(--dv-ink)}
 .dv-tt b{font-weight:600}

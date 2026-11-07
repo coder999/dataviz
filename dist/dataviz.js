@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.5.4 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.6.0 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -51,7 +51,25 @@
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  const DV = { version: '0.5.4', fmt: { money, pct, count, day } };
+  /* ---------- live-chart time helpers (pure; covered by test/live.test.js) ---------- */
+  // Points are [tMs, value]. Keep the window plus 60 s of slack, so the line enters from the left edge.
+  function trim(points, now, windowMs) { return points.filter(p => p[0] >= now - windowMs - 60e3); }
+  // Carry the last value flat to `now`, so the line meets the right edge without inventing a value.
+  // A series silent for longer than holdMax just ends: a host that stopped reporting must not look live.
+  function held(points, now, holdMax) {
+    const last = points[points.length - 1];
+    return last && last[0] < now && now - last[0] <= holdMax ? points.concat([[now, last[1]]]) : points.slice();
+  }
+  // Tooltip heading for time v: 'now', '−3m', or '−30s' when the window is two minutes or less.
+  // (The axis itself shows clock times, which slide with the data instead of changing their text.)
+  function ago(v, now, windowMs) {
+    const s = (now - v) / 1e3;
+    if (windowMs <= 120e3) return Math.round(s) <= 0 ? 'now' : MINUS + Math.round(s) + 's';
+    const m = Math.round(s / 60);
+    return m <= 0 ? 'now' : MINUS + m + 'm';
+  }
+
+  const DV = { version: '0.6.0', fmt: { money, pct, count, day }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -96,7 +114,7 @@
 
   function draw(el, e, animate) {
     const t = theme(el), opt = e.build(t);
-    opt.animation = !!animate && !reduced();
+    opt.animation = opt.animation !== false && !!animate && !reduced(); // a builder may opt out (DV.live)
     opt.aria = { enabled: false }; // we label the container ourselves
     opt.textStyle = { fontFamily: t.fontUi, color: t.ink };
     e.chart.setOption(opt, { notMerge: true });
@@ -112,14 +130,14 @@
   function queue() { if (!queued) { queued = true; requestAnimationFrame(redrawAll); } }
   const ro = root.ResizeObserver ? new ResizeObserver(queue) : null;
 
-  function mount(el, build, label, table) {
+  function mount(el, build, label, table, renderer) {
     if (typeof el === 'string') el = document.querySelector(el);
     el.classList.add('dv-chart');
     el.setAttribute('role', 'img');
     el.setAttribute('aria-label', label);
     let e = charts.get(el);
     if (!e) {
-      const chart = root.echarts.getInstanceByDom(el) || root.echarts.init(el, null, { renderer: 'svg' });
+      const chart = root.echarts.getInstanceByDom(el) || root.echarts.init(el, null, { renderer: renderer || 'svg' });
       chart.on('click', p => { if (p.componentType === 'markLine' && p.name && known.has(p.name)) marks.toggle(p.name); });
       e = { chart };
       charts.set(el, e);
@@ -552,6 +570,88 @@
     }, o.label || 'Daily: ' + d.series.map(s => `${s.name} ${count(s.values[0])} on ${labels[0]}, ${count(s.values[n - 1])} on ${labels[n - 1]}`).join('; '),
     { caption: o.label || 'Daily', columns: ['Date'].concat(d.series.map(s => s.name), b ? [bandName] : []),
       rows: labels.map((l, i) => [l].concat(d.series.map(s => count(s.values[i])), b ? [`${count(b.lo[i])}–${count(b.hi[i])}`] : [])) });
+  };
+
+  /* ---------- DV.live: a sliding time window over streaming points ---------- */
+  // d = { series: [{ name, points: [[tMs, v], ...], line?: 1-4 }], window: seconds (600), max?, format?(v), holdMax?: seconds (90) }
+  // o = { label, compact, fps }. Returns the ECharts instance with .push(seriesIndex, [tMs, v]) attached.
+  // The window slides on one shared animation loop, only while the chart is on screen and the tab is visible.
+  // Canvas, not SVG: redrawing SVG paths many times a second is what would cost a phone.
+  const lives = new Map(); // el -> live state
+  let looping = false;
+  const io = root.IntersectionObserver ? new IntersectionObserver(es => es.forEach(e => {
+    const L = lives.get(e.target); if (L) L.visible = e.isIntersecting; if (e.isIntersecting) startLoop();
+  })) : null;
+  function liveData(L, now) { return L.series.map(s => held(s.points, now, L.holdMax)); }
+  function slide(L, now) {
+    L.now = now; L.last = now;
+    L.chart.setOption({ xAxis: { min: now - L.win, max: now }, series: liveData(L, now).map(data => ({ data })) }, { lazyUpdate: false, silent: true });
+  }
+  function startLoop() { if (!looping && !reduced()) { looping = true; requestAnimationFrame(tick); } }
+  function tick() {
+    const now = Date.now();
+    let any = false;
+    lives.forEach((L, el) => {
+      if (!el.isConnected) { lives.delete(el); if (io) io.unobserve(el); return; }
+      if (!L.visible) return;
+      any = true;
+      if (now - L.last >= 1000 / L.fps) slide(L, now);
+    });
+    if (any && !document.hidden && !reduced()) requestAnimationFrame(tick); else looping = false;
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) startLoop(); });
+  function liveTable(L) {
+    return { caption: L.label, columns: ['Series', 'Latest', 'Low', 'High'], rows: L.series.map(s => {
+      const v = s.points.map(p => p[1]);
+      return [s.name, v.length ? L.format(v[v.length - 1]) : '—', v.length ? L.format(Math.min.apply(null, v)) : '—', v.length ? L.format(Math.max.apply(null, v)) : '—'];
+    }) };
+  }
+
+  DV.live = function (el, d, o) {
+    o = o || {};
+    if (typeof el === 'string') el = document.querySelector(el);
+    const compact = !!o.compact, win = (d.window || 600) * 1e3;
+    el.classList.toggle('dv-compact', compact);
+    const L = lives.get(el) || { visible: !io, last: 0 };
+    Object.assign(L, { win, compact, fps: o.fps || (compact ? 8 : 30), holdMax: (d.holdMax || 90) * 1e3,
+      format: d.format || (v => count(v)), now: Date.now(),
+      series: d.series.map(s => ({ name: s.name, line: s.line, points: trim(s.points.slice(), Date.now(), win) })) });
+    L.label = o.label || 'Live: ' + L.series.map(s => s.name + ' ' + (s.points.length ? L.format(s.points[s.points.length - 1][1]) : 'no data')).join('; ');
+    const chart = mount(el, t => {
+      const col = (s, k) => t.line[((s.line || k + 1) - 1) % 4];
+      return {
+        animation: false,
+        grid: compact ? { left: 0, right: 0, top: 2, bottom: 0 } : { left: 0, right: 8, top: 8, bottom: 0, containLabel: true },
+        tooltip: compact ? { show: false } : Object.assign(tip(t), { formatter: ps => `<b>${ago(ps[0].axisValue, L.now, L.win)}</b>` +
+          ps.map(p => ttRow('dv-line-' + (((L.series[p.seriesIndex].line || p.seriesIndex + 1) - 1) % 4 + 1), p.seriesName, L.format(p.value[1]))).join('') }),
+        xAxis: { type: 'time', min: L.now - L.win, max: L.now, show: !compact, splitNumber: 5,
+          axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+          axisLabel: { color: t.ink2, fontSize: 11, fontFamily: t.fontUi, hideOverlap: true,
+            formatter: v => new Date(v).toLocaleTimeString([], L.win <= 120e3 ? { hour: 'numeric', minute: '2-digit', second: '2-digit' } : { hour: 'numeric', minute: '2-digit' }) } },
+        yAxis: { type: 'value', min: 0, max: d.max, show: !compact, position: 'right', splitNumber: 2,
+          axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: t.ruleSoft } },
+          axisLabel: { color: t.ink2, fontSize: 11, fontFamily: t.fontUi, formatter: v => L.format(v) } },
+        series: L.series.map((s, k) => ({ name: s.name, type: 'line', showSymbol: false, smooth: 0.25, smoothMonotone: 'x',
+          data: held(s.points, L.now, L.holdMax), z: 4 - k % 4, itemStyle: { color: col(s, k) },
+          lineStyle: { color: col(s, k), width: compact ? 1.5 : 2 },
+          areaStyle: { color: new root.echarts.graphic.LinearGradient(0, 0, 0, 1,
+            [{ offset: 0, color: alpha(col(s, k), L.series.length > 1 ? 0.18 : 0.35) }, { offset: 1, color: alpha(col(s, k), 0) }]) } })),
+      };
+    }, L.label, liveTable(L), 'canvas');
+    L.chart = chart;
+    if (!lives.has(el)) {
+      lives.set(el, L);
+      if (io) io.observe(el);
+      chart.push = (i, p) => {
+        const s = L.series[i]; if (!s) return;
+        s.points.push(p);
+        s.points = trim(s.points, Date.now(), L.win);
+        DV.table(el, liveTable(L));
+        if (reduced() || !L.visible) slide(L, Date.now()); else startLoop();
+      };
+    }
+    startLoop();
+    return chart;
   };
 
   // Cash flow. {nodes:[{name, slot?|tint?}], links:[{source, target, value}]}, names unique.

@@ -65,5 +65,18 @@
     band: { lo: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 38 : 52), hi: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 58 : 76) } });
   DV.daily('#c-day2', { dates, yTicks: 3, series: [
     { name: 'Family blog', values: blog }, { name: 'Recipe site', values: visits(41, 0) }, { name: 'Photo archive', values: visits(18, 0) }] });
+  // Live: synthetic smooth signals, so the screenshots are stable. CPU every 2 s, network every 30 s.
+  const cpuAt = t => 30 + 15 * Math.sin(t / 37e3) + 8 * Math.sin(t / 11e3);
+  const netAt = (t, k) => Math.round((k ? 0.3e6 : 1.2e6) * (1.4 + Math.sin(t / 95e3 + k)));
+  const back = (every, f) => { const n = Date.now(), out = []; for (let t = n - 600e3; t <= n; t += every) out.push([t, f(t)]); return out; };
+  const bps = v => DV.fmt.count(v, { compact: true }) + 'B/s';
+  const cpu = DV.live('#c-live', { max: 100, format: v => pct(v), series: [{ name: 'CPU', points: back(2e3, cpuAt) }] }, { label: 'Server CPU, last 10 minutes' });
+  const spark = DV.live('#c-spark', { max: 100, format: v => pct(v), series: [{ name: 'CPU', points: back(2e3, cpuAt) }] }, { compact: true, label: 'Server CPU sparkline' });
+  const net = DV.live('#c-net', { format: bps, series: [{ name: 'Down', points: back(30e3, t => netAt(t, 0)) }, { name: 'Up', points: back(30e3, t => netAt(t, 1)) }] }, { label: 'Network, last 10 minutes' });
+  const cpuNow = document.getElementById('cpuNow');
+  const showCpu = t => { cpuNow.innerHTML = `${pct(cpuAt(t))} <small>now</small>`; };
+  showCpu(Date.now());
+  setInterval(() => { const t = Date.now(); cpu.push(0, [t, cpuAt(t)]); spark.push(0, [t, cpuAt(t)]); showCpu(t); }, 2e3);
+  setInterval(() => { const t = Date.now(); net.push(0, [t, netAt(t, 0)]); net.push(1, [t, netAt(t, 1)]); }, 30e3);
   DV.marks.set('B');
 })();

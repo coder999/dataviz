@@ -55,6 +55,8 @@ DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], ma
 DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
 DV.lines(el, { years, series: [{ name, values }], marks, ages });
 DV.daily(el, { dates: ['2026-10-03', …], series: [{ name, values }], band: { lo, hi } });
+const c = DV.live(el, { series: [{ name: 'CPU', points: [[Date.now(), 12], …] }], max: 100, format: v => DV.fmt.pct(v) });
+c.push(0, [Date.now(), 14]);
 ```
 
 - `el` is an element or a selector. Every builder returns the ECharts instance.
@@ -110,6 +112,30 @@ DV.daily(el, { dates: ['2026-10-03', …], series: [{ name, values }], band: { l
   its marks is active, so give each event its own `data-dv-mark` control too.
   The mark lines stop short of the staff names and break around the amounts.
   A pending label steps past any mark line it would cross.
+
+### Live charts
+
+`DV.live(el, d, o)` draws streaming `[tMs, value]` points on a time window that slides
+continuously, with a gradient-filled area under each line (the network-dashboard look).
+
+- `d.series`: `[{ name, points, line? }]`. Series k wears `--dv-line-k`, or `line: 1–4` to choose one.
+- `d.window`: seconds shown, default 600. `d.max` fixes the value axis (100 for a percentage);
+  leave it out and the axis follows the data (throughput). `d.format(v)` formats the axis, the
+  tooltip and the hidden table, defaulting to `DV.fmt.count`.
+- The returned instance has `.push(seriesIndex, [tMs, value])`. Feed new points as they arrive;
+  points older than the window plus 60 s are dropped.
+- **Nothing is invented.** Between points the line holds the last value flat to now. A series
+  silent for longer than `d.holdMax` seconds (default 90) stops holding, so a source that went
+  quiet shows a gap instead of looking live.
+- The axis shows clock times, which slide with the data. The tooltip heading says how long ago
+  (`−3m`, or `−30s` for a window of two minutes or less).
+- `o.compact: true` is a sparkline with no axes. A compact chart takes the height its container
+  gives it (`.dv-compact` lifts the usual 120px minimum).
+- Motion: one shared animation loop drives every live chart, at `o.fps` (30 by default, 8 when
+  compact). It runs only while a chart is on screen and the tab is visible. With reduced motion
+  there is no loop: the chart redraws when a point is pushed. Live charts use ECharts' canvas
+  renderer rather than SVG, because redrawing SVG paths many times a second is what costs a phone.
+- The hidden data table gives each series' latest value and its low and high over the window.
 
 ### Cash-flow sankey
 
