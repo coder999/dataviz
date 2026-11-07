@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.6.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.6.1 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -69,7 +69,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.6.0', fmt: { money, pct, count, day }, time: { trim, held, ago } };
+  const DV = { version: '0.6.1', fmt: { money, pct, count, day }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -574,7 +574,9 @@
 
   /* ---------- DV.live: a sliding time window over streaming points ---------- */
   // d = { series: [{ name, points: [[tMs, v], ...], line?: 1-4 }], window: seconds (600), max?, format?(v), holdMax?: seconds (90) }
-  // o = { label, compact, fps }. Returns the ECharts instance with .push(seriesIndex, [tMs, v]) attached.
+  // o = { label, compact, fps, gutter }. gutter (px, default 64) is the value-label column on the right: a fixed
+  // width, not containLabel, so charts stacked in a column end at the same x whatever their labels say.
+  // Returns the ECharts instance with .push(seriesIndex, [tMs, v]) attached.
   // The window slides on one shared animation loop, only while the chart is on screen and the tab is visible.
   // Canvas, not SVG: redrawing SVG paths many times a second is what would cost a phone.
   const lives = new Map(); // el -> live state
@@ -621,12 +623,12 @@
       const col = (s, k) => t.line[((s.line || k + 1) - 1) % 4];
       return {
         animation: false,
-        grid: compact ? { left: 0, right: 0, top: 2, bottom: 0 } : { left: 0, right: 8, top: 8, bottom: 0, containLabel: true },
+        grid: compact ? { left: 0, right: 0, top: 2, bottom: 0 } : { left: 0, right: o.gutter || 64, top: 10, bottom: 22 },
         tooltip: compact ? { show: false } : Object.assign(tip(t), { formatter: ps => `<b>${ago(ps[0].axisValue, L.now, L.win)}</b>` +
           ps.map(p => ttRow('dv-line-' + (((L.series[p.seriesIndex].line || p.seriesIndex + 1) - 1) % 4 + 1), p.seriesName, L.format(p.value[1]))).join('') }),
-        xAxis: { type: 'time', min: L.now - L.win, max: L.now, show: !compact, splitNumber: 5,
+        xAxis: { type: 'time', min: L.now - L.win, max: L.now, show: !compact, splitNumber: t.small ? 3 : 5,
           axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-          axisLabel: { color: t.ink2, fontSize: 11, fontFamily: t.fontUi, hideOverlap: true,
+          axisLabel: { color: t.ink2, fontSize: 11, fontFamily: t.fontUi, hideOverlap: true, alignMinLabel: 'left', alignMaxLabel: 'right',
             formatter: v => new Date(v).toLocaleTimeString([], L.win <= 120e3 ? { hour: 'numeric', minute: '2-digit', second: '2-digit' } : { hour: 'numeric', minute: '2-digit' }) } },
         yAxis: { type: 'value', min: 0, max: d.max, show: !compact, position: 'right', splitNumber: 2,
           axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: t.ruleSoft } },

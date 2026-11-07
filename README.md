@@ -129,6 +129,8 @@ continuously, with a gradient-filled area under each line (the network-dashboard
   quiet shows a gap instead of looking live.
 - The axis shows clock times, which slide with the data. The tooltip heading says how long ago
   (`−3m`, or `−30s` for a window of two minutes or less).
+- `o.gutter` (px, default 64) is the width of the value labels on the right. It is fixed rather than
+  fitted to the labels, so live charts stacked in a column end at the same x.
 - `o.compact: true` is a sparkline with no axes. A compact chart takes the height its container
   gives it (`.dv-compact` lifts the usual 120px minimum).
 - Motion: one shared animation loop drives every live chart, at `o.fps` (30 by default, 8 when
