@@ -39,7 +39,7 @@
     { name: 'Sam · Social Security', values: D.income.ssSam, slot: 2 },
     { name: 'Joint · Withdrawals', values: D.income.withdrawals, slot: 3 },
   ] });
-  DV.fan('#c-fan', Object.assign({ years: D.years, marks: D.events, ages, tint: 1, yTicks: 4,
+  DV.fan('#c-fan', Object.assign({ years: D.years, marks: D.events, ages, tint: 1, yTicks: 4, yMax: Math.round(Math.max.apply(null, D.fan.p75) * 1.2),
     line: { name: 'One assumed-return path', values: D.fan.p50.map((v, i) => Math.round(v * (1 + 0.004 * i))) } }, D.fan));
   DV.stacked('#c-stk', { years: D.years, marks: D.events, series: [
     { name: 'Pre-tax', values: D.balances.pretax, tint: 1 },

@@ -70,8 +70,13 @@ DV.daily(el, { dates: ['2026-10-03', …], series: [{ name, values }], band: { l
   A fan that is not a person (a household's investable money) passes `tint: 1–5` in the data
   instead (use an odd step, so the median line reads on the ground). `line: { name, values }`
   overlays one more stepped line, such as the single deterministic projection, in
-  `--dv-line-2` and dashed, with its own legend entry, tooltip row and table column. The value
-  axis starts at 0; `yTicks` works as on `DV.stacked`.
+  `--dv-line-2` and dashed above the median, with a dashed legend key, its own tooltip row and table
+  column. The value axis starts at 0; `yTicks` works as on `DV.stacked`. `yMax` caps the axis (for
+  example 1.2 × the largest 75th percentile, so a long 95th-percentile tail does not flatten the rest):
+  bands and lines are clipped at it and the plot's top-right corner reads "5th–95th continues to $39M
+  by 2076". The tooltip and the hidden data table keep the full values.
+- `DV.fan`, `DV.stacked` and `DV.lines` keep rehearsal letters in one row at every width: marks whose
+  boxes would collide merge into one box (`D·E`, or `D–F` for a run of consecutive letters).
 - Every builder accepts `{ label }` in its third argument to override the
   generated `aria-label` and table caption.
 - `name` on a score staff may be `"Owner · Source"`. On narrow charts it wraps
@@ -187,6 +192,9 @@ CSP blocks them.
 
 ## Changes
 
+- **0.5.1** (2026-11-07): `DV.fan` takes `yMax` (clipped bands, a "continues to" label) and draws
+  a dashed legend key for its overlaid line; `DV.fan`, `DV.stacked` and `DV.lines` merge colliding
+  rehearsal marks into one box at every width (`D–F` for a consecutive run).
 - **0.5.0** (2026-11-06): `DV.fan` takes `tint` (non-person fans), `line` (an overlaid dashed
   line such as the deterministic path, in the legend, tooltip and data table) and `yTicks`; its value
   axis starts at 0 and its top margin follows the wrapped legend like `DV.stacked`.

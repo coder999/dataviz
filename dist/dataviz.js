@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.5.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.5.1 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -51,7 +51,7 @@
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  const DV = { version: '0.5.0', fmt: { money, pct, count, day } };
+  const DV = { version: '0.5.1', fmt: { money, pct, count, day } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -171,9 +171,14 @@
   });
 
   // perYear (px per year): when set, letters keep to one row and marks whose boxes would collide
-  // merge into one box ("D·E") on the first mark's line. Every line still draws; tapping a merged
-  // box selects its first mark, and it fills when any of its marks is active. Without perYear,
-  // narrow charts stagger the letters in two tiers.
+  // merge into one box ("D·E", or "D–F" for a run of three or more consecutive letters) on the first
+  // mark's line. Every line still draws; tapping a merged box selects its first mark, and it fills when
+  // any of its marks is active. Without perYear, narrow charts stagger the letters in two tiers.
+  // Since 0.5.1 DV.fan, DV.stacked and DV.lines pass perYear at every width (DV.score only when narrow).
+  function mergedText(g) {
+    const run = g.length > 2 && g.every((m, i) => !i || m.mark.charCodeAt(0) === g[i - 1].mark.charCodeAt(0) + 1);
+    return run ? g[0].mark + '–' + g[g.length - 1].mark : g.map(x => x.mark).join('·');
+  }
   function markLayers(t, list, compact, pos, perYear) {
     if (!list || !list.length) return {};
     list.forEach(m => known.set(m.mark, m));
@@ -181,10 +186,11 @@
     let lead = null; // first mark of each merged group -> its letters
     if (perYear) {
       lead = new Map();
-      const half = n => (n * 7 + (n - 1) * 7 + 8) / 2; // box half-width for n letters at the compact size
+      // box half-width for a label: ~7px a glyph at the compact size, ~8.5px at the full size, plus padding
+      const half = g => (mergedText(g).length * (compact ? 7 : 8.5) + (compact ? 8 : 12)) / 2;
       let g = null;
       list.slice().sort((a, b) => a.year - b.year).forEach(m => {
-        if (g && (m.year - g[0].year) * perYear < half(g.length) + half(1) + 4) g.push(m);
+        if (g && (m.year - g[0].year) * perYear < half(g) + half([m]) + 4) g.push(m);
         else { g = [m]; lead.set(m.mark, g); }
       });
     }
@@ -197,7 +203,7 @@
           const on = m.mark === act, g = lead && lead.get(m.mark), box = g ? g.some(x => x.mark === act) : on;
           const label = { show: !lead || !!g, distance: !perYear && t.small && j % 2 ? (compact ? 17 : 21) : 3,
             backgroundColor: box ? t.accent : t.surface, color: box ? t.onAccent : t.accent };
-          if (g && g.length > 1) label.formatter = g.map(x => x.mark).join('·');
+          if (g && g.length > 1) label.formatter = mergedText(g);
           return { name: m.mark, xAxis: m.year,
             lineStyle: { color: on ? t.accent : t.markLine, width: on ? 1.5 : 1, type: on ? 'solid' : [2, 3] }, label };
         }),
@@ -314,33 +320,45 @@
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat([pct(d.pct[i])])) });
   };
 
-  // Percentile fan: {years, p5, p25, p50, p75, p95, marks, ages?, ageSlots?, tint?, line?, yTicks?}.
+  // Percentile fan: {years, p5, p25, p50, p75, p95, marks, ages?, ageSlots?, tint?, line?, yTicks?, yMax?}.
   // Nested bands 5th–95th and 25th–75th with the median line over them, in one colour: a person's
   // ribbon ({slot} in the third argument, default 3) or, for a series that is not a person, d.tint (1-5,
   // use an odd step so the median reads on the ground). line: {name, values} overlays one more stepped
-  // line (e.g. the single deterministic path) in --dv-line-2, dashed, so it never reads as a percentile.
+  // line (e.g. the single deterministic path) in --dv-line-2, dashed, above the median, with a dashed
+  // legend key. yMax caps the value axis: anything above it is clipped at the ceiling and the plot's
+  // top-right corner says how far the 5th–95th band continues ("5th–95th continues to $39M by 2076").
+  // The tooltip and the hidden data table always keep the full values.
   DV.fan = function (el, d, o) {
     o = o || {};
-    const y0 = d.years[0], n = d.years.length, ln = d.line;
+    const y0 = d.years[0], n = d.years.length, ln = d.line, cap = d.yMax || Infinity;
+    const clip = a => a.map(v => Math.min(v, cap));
     const names = ['5th–95th percentile', '25th–75th', 'Median'];
+    const top95 = d.p95.reduce((b, v, i) => (v > b.v ? { v, i } : b), { v: -Infinity, i: 0 });
     return mount(el, t => {
       const c = d.tint ? t.tint[(d.tint - 1) % 5] : slotColor(t, o.slot || 3), lc = t.line[1];
-      const band = (name, lo, hi, op) => stepBand(name, d.years, lo, hi, { fill: alpha(c, op) });
-      const items = [{ name: names[0], icon: 'rect' }, { name: names[1], icon: 'rect' }, { name: names[2] }].concat(ln ? [{ name: ln.name }] : []);
+      const band = (name, lo, hi, op) => stepBand(name, d.years, clip(lo), clip(hi), { fill: alpha(c, op) });
+      const dash = [6, 4];
+      const items = [{ name: names[0], icon: 'rect' }, { name: names[1], icon: 'rect' }, { name: names[2], icon: 'path://M0,4h26v2h-26z' }]
+        .concat(ln ? [{ name: ln.name, icon: 'path://M0,4h8v2h-8zM11,4h8v2h-8zM22,4h4v2h-4z', itemStyle: { color: lc } }] : []);
+      const perYear = (t.width - 60) / n, top = legendRoom(t, items.map(x => x.name)) + markRoom(t, d.marks, true);
       const series = [band(names[0], d.p5, d.p95, 0.16), band(names[1], d.p25, d.p75, 0.3),
-        Object.assign({ name: names[2], type: 'line', data: yearData(d.years, d.p50), step: 'end', symbol: 'none', z: 4,
-          itemStyle: { color: c }, lineStyle: { color: c, width: 2 } }, markLayers(t, d.marks, false))];
-      if (ln) series.push({ name: ln.name, type: 'line', data: yearData(d.years, ln.values), step: 'end', symbol: 'none', z: 5,
-        itemStyle: { color: lc }, lineStyle: { color: lc, width: 2, type: DASH[1] } });
+        Object.assign({ name: names[2], type: 'line', data: yearData(d.years, clip(d.p50)), step: 'end', symbol: 'none', z: 4,
+          itemStyle: { color: c }, lineStyle: { color: c, width: 2 } }, markLayers(t, d.marks, false, null, perYear))];
+      if (ln) series.push({ name: ln.name, type: 'line', data: yearData(d.years, clip(ln.values)), step: 'end', symbol: 'none', z: 6,
+        itemStyle: { color: lc }, lineStyle: { color: lc, width: 2, type: dash } });
+      const capped = top95.v > cap;
       return {
-        legend: legend(t, items),
-        grid: { left: 8, right: t.small ? 6 : 12, top: legendRoom(t, items.map(x => x.name)) + markRoom(t, d.marks), bottom: 0, containLabel: true },
+        legend: Object.assign(legend(t, items), { itemWidth: 26 }),
+        grid: { left: 8, right: t.small ? 6 : 12, top, bottom: 0, containLabel: true },
+        graphic: capped ? [{ type: 'text', right: t.small ? 8 : 14, top: top + 4, silent: true, z: 10,
+          style: { text: `5th–95th continues to ${money(top95.v, { trim: true })} by ${d.years[top95.i]}`, fill: t.ink2,
+            font: `500 11px ${t.fontUi}`, backgroundColor: t.surface, padding: [2, 4] } }] : [],
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
           const r = (a, b) => `<span class="dv-num">${money(a)} – ${money(b)}</span>`;
           return `${ttHead(y, d.ages, i)}<br>Median <b class="dv-num">${money(d.p50[i])}</b><br>25th–75th ${r(d.p25[i], d.p75[i])}<br>5th–95th ${r(d.p5[i], d.p95[i])}` +
             (ln ? ttRow('dv-line-2', ln.name, money(ln.values[i])) : ''); } }),
         xAxis: yearAxis(t, d.years, d.ages, t.width - 60, d.ageSlots),
-        yAxis: moneyAxis(t, Object.assign({ min: 0 }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {})),
+        yAxis: moneyAxis(t, Object.assign({ min: 0 }, isFinite(cap) ? { max: cap } : {}, d.yTicks ? { splitNumber: d.yTicks - 1 } : {})),
         series,
       };
     }, o.label || `Projected balance, 5th to 95th percentile: median ${money(d.p50[0])} in ${y0}, ${money(d.p50[n - 1])} in ${d.years[n - 1]}` +
@@ -357,7 +375,7 @@
     d.series.forEach((s, k) => cum.push(cum[k].map((v, i) => v + (s.values[i] || 0))));
     return mount(el, t => ({
       legend: legend(t, d.series.map(s => ({ name: s.name, icon: 'rect' }))),
-      grid: { left: 8, right: t.small ? 6 : 12, top: legendRoom(t, d.series.map(s => s.name)) + markRoom(t, d.marks), bottom: 0, containLabel: true },
+      grid: { left: 8, right: t.small ? 6 : 12, top: legendRoom(t, d.series.map(s => s.name)) + markRoom(t, d.marks, true), bottom: 0, containLabel: true },
       tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
         return ttHead(y, d.ages, i) + d.series.map((s, k) => [s, k]).reverse().map(([s, k]) => ttRow(keyClass(s, k), s.name, money(s.values[i]))).join('') +
           `<div class="dv-tt-row">Total<span class="dv-num">${money(total(i))}</span></div>`; } }),
@@ -366,7 +384,7 @@
       // no stroke between bands: neighbouring tints already differ >= 3:1, and a stroke drew every year's step
       series: d.series.map((s, k) => stepBand(s.name, d.years, cum[k], cum[k + 1], { fill: seriesColor(t, s, k) }))
         // invisible carrier for the axis tooltip and the rehearsal marks
-        .concat([Object.assign({ type: 'line', data: yearData(d.years, cum[cum.length - 1]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 }, markLayers(t, d.marks, false))]),
+        .concat([Object.assign({ type: 'line', data: yearData(d.years, cum[cum.length - 1]), showSymbol: false, lineStyle: { opacity: 0 }, z: 3 }, markLayers(t, d.marks, false, null, (t.width - 60) / n))]),
     }), o.label || `Balances by type, stacked: total ${money(total(0))} in ${y0}, ${money(total(n - 1))} in ${d.years[n - 1]}`,
     { caption: o.label || 'Balances by type', columns: yearCols(d.ages).concat(d.series.map(s => s.name), ['Total']),
       rows: d.years.map((y, i) => yearRow(d.years, d.ages, i).concat(d.series.map(s => money(s.values[i])), [money(total(i))])) });
@@ -475,7 +493,7 @@
     return mount(el, t => {
       const col = k => t.line[k % 4], endW = t.small ? 92 : 150;
       return {
-        grid: { left: 8, right: endW, top: 6 + markRoom(t, d.marks), bottom: 0, containLabel: true },
+        grid: { left: 8, right: endW, top: 6 + markRoom(t, d.marks, true), bottom: 0, containLabel: true },
         tooltip: Object.assign(tip(t), { formatter: ps => { const y = yearOf(ps), i = y - y0; if (i < 0 || i >= n) return '';
           return ttHead(y, d.ages, i) + d.series.map((s, k) => ttRow('dv-line-' + (k % 4 + 1), s.name, money(s.values[i]))).join(''); } }),
         xAxis: yearAxis(t, d.years, d.ages, t.width - 60 - endW, d.ageSlots),
@@ -487,7 +505,7 @@
           endLabel: { show: true, distance: 6,
             formatter: () => `{n|${wrapName(s.name, t.small ? 13 : 22)}}\n{v|${money(last(s))}}`,
             rich: { n: { color: t.ink, fontFamily: t.fontUi, fontSize: 11.5, lineHeight: 13 }, v: { color: t.ink2, fontFamily: t.fontFig, fontSize: 11.5, lineHeight: 13 } } } },
-        k ? {} : markLayers(t, d.marks, false))),
+        k ? {} : markLayers(t, d.marks, false, null, (t.width - 60 - endW) / n))),
       };
     }, o.label || 'Lines by year: ' + d.series.map(s => `${s.name} ${money(s.values[0])} in ${y0}, ${money(last(s))} in ${d.years[n - 1]}`).join('; '),
     { caption: o.label || 'Lines by year', columns: yearCols(d.ages).concat(d.series.map(s => s.name)),
