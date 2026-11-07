@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.5.3 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.5.4 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -51,7 +51,7 @@
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
   }
 
-  const DV = { version: '0.5.3', fmt: { money, pct, count, day } };
+  const DV = { version: '0.5.4', fmt: { money, pct, count, day } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -463,7 +463,10 @@
                 const v = vals[k], txt = money(lv[k]), w = txt.length * 6.6 + 8, x0 = x(y0 + k);
                 const room = (j + 1 < starts.length ? x(y0 + starts[j + 1]) : x(y1 + 1)) - x0;
                 if (room < w) return;
-                const inside = th(v) >= 15;
+                // inside only if the band itself is wide enough; a short run followed by zeros labels above it
+                let e = k + 1;
+                while (e < lv.length && lv[e] > 0 && starts[j + 1] !== e) e++;
+                const inside = th(v) >= 15 && x(y0 + e) - x0 >= w;
                 lab({ text: txt, x: x0 + 5, y: inside ? cy : cy - th(v) / 2 - 3, verticalAlign: inside ? 'middle' : 'bottom',
                   fill: inside ? t.onEntity : t.ink, font: `600 11px ${t.fontUi}` }, inside ? col : t.surface);
               });

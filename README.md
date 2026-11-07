@@ -192,6 +192,7 @@ CSP blocks them.
 
 ## Changes
 
+- **0.5.4** (2026-11-07): a score label goes inside its band only when the band's own run is wide enough for it; a one-year spike followed by zeros is labeled above it, not cut off.
 - **0.5.3** (2026-11-07): the fan's "continues to" label rounds to two significant figures ($39M, not $39.19M): a 95th percentile of 1,000 futures is not that precise.
 - **0.5.2** (2026-11-07): `DV.fan`'s overlaid line sits on a surface-coloured casing so its dashes stay
   legible over the median and the bands.
