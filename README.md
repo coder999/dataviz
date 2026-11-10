@@ -223,6 +223,9 @@ CSP blocks them.
 
 ## Changes
 
+- **0.7.1** (2026-11-10): `DV.bars` measures its wrapped legend with the real font, so it no longer
+  overlaps the plot in narrow cards, and thins value-axis ticks on narrow horizontal charts.
+  `DV.daily` keeps its first and last axis labels inside the plot (the last one was clipped).
 - **0.7.0** (2026-11-10): `DV.bars`, bars on a category axis: vertical or horizontal (ranked,
   long names truncated), optionally stacked, with optional value labels past each bar's end.
   Series may take `color` as a custom property name (`'--series-3'`), read at draw time. Fixes the

@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.7.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.7.1 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -69,7 +69,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.7.0', fmt: { money, pct, count, day }, time: { trim, held, ago } };
+  const DV = { version: '0.7.1', fmt: { money, pct, count, day }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -563,7 +563,8 @@
           return `<b>${esc(labels[i])}</b>` + d.series.map((s, k) => ttRow('dv-line-' + (k % 4 + 1), s.name, count(s.values[i]))).join('') +
             (b ? ttRow('dv-band', bandName, `${count(b.lo[i])}–${count(b.hi[i])}`) : ''); } }),
         xAxis: { type: 'category', boundaryGap: false, data: labels, axisLine: { lineStyle: { color: t.ink } }, axisTick: { show: false },
-          axisLabel: { color: t.ink, fontSize: 11, hideOverlap: true } },
+          // first and last labels sit inside the plot, not centred on its edges where they were clipped
+          axisLabel: { color: t.ink, fontSize: 11, hideOverlap: true, alignMinLabel: 'left', alignMaxLabel: 'right' } },
         yAxis: Object.assign({ type: 'value', min: 0, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: t.ruleSoft } },
           axisLabel: { formatter: v => count(v, { compact: true }), color: t.ink2, fontSize: 11, fontFamily: t.fontUi } }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {}),
         series,
@@ -580,6 +581,17 @@
   // `valueLabels` prints each bar's value past its end (not with `stacked`). A series colour is its
   // `slot` (a person), `tint` (not a person) or `color`: a custom property name such as '--series-3',
   // read at draw time so it follows the theme. With none of those, series take --dv-line-1..4.
+  // Height of a wrapped legend, measured with the real font rather than legendRoom()'s
+  // per-character guess, which ran short in narrow cards and let the legend sit on the plot.
+  let measureCtx = null;
+  function legendHeight(t, names) {
+    measureCtx = measureCtx || document.createElement('canvas').getContext('2d');
+    measureCtx.font = '12px ' + t.fontUi;
+    let rows = 1, x = 0;
+    names.forEach(n => { const w = 14 + 5 + measureCtx.measureText(String(n)).width; if (x && x + w > t.width - 10) { rows++; x = 0; } x += w + 16; });
+    return rows * 28; // a row as ECharts draws it here; the 10 is the legend's own padding
+  }
+
   DV.bars = function (el, d, o) {
     o = o || {};
     const fmt = o.format || count, hz = !!d.horizontal, stack = !!d.stacked && d.series.length > 1;
@@ -594,10 +606,11 @@
           hz ? { width: t.small ? 110 : 260, overflow: 'truncate' } : {}) };
       const val = Object.assign({ type: 'value', min: 0, axisLine: { show: false }, axisTick: { show: false },
         splitLine: { lineStyle: { color: t.ruleSoft } },
-        axisLabel: { formatter: v => fmt(v), color: t.ink2, fontSize: 11, fontFamily: t.fontUi } }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {});
+        axisLabel: { formatter: v => fmt(v), color: t.ink2, fontSize: 11, fontFamily: t.fontUi, hideOverlap: true } },
+        d.yTicks ? { splitNumber: d.yTicks - 1 } : hz && t.width < 480 ? { splitNumber: 3 } : {});
       const multi = d.series.length > 1;
       return {
-        grid: { left: 8, right: showLabels && hz ? 56 : 12, top: multi ? legendRoom(t, d.series.map(s => s.name)) + 6 : (showLabels && !hz ? 22 : 10), bottom: 0, containLabel: true },
+        grid: { left: 8, right: showLabels && hz ? 56 : 12, top: multi ? legendHeight(t, d.series.map(s => s.name)) + 8 : (showLabels && !hz ? 22 : 10), bottom: 0, containLabel: true },
         legend: multi ? legend(t, d.series.map(s => ({ name: s.name, icon: 'rect' }))) : { show: false },
         // Built as nodes, not an HTML string: key colours are arbitrary here, and a style="" attribute
         // would break under the strict CSP the demo is checked against (CSSOM writes are allowed).
