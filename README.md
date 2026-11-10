@@ -223,6 +223,7 @@ CSP blocks them.
 
 ## Changes
 
+- **0.7.3** (2026-11-10): `DV.bars` takes `labelClicks`: category labels emit `click` like their bars.
 - **0.7.2** (2026-11-10): `DV.bars` takes `secondary`, booleans aligned to `labels`: those bars draw
   lighter with muted labels, for rows breaking down the bar above them (an expanded group).
 - **0.7.1** (2026-11-10): `DV.bars` measures its wrapped legend with the real font, so it no longer

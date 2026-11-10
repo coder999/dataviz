@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.7.2 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.7.3 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -69,7 +69,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.7.2', fmt: { money, pct, count, day }, time: { trim, held, ago } };
+  const DV = { version: '0.7.3', fmt: { money, pct, count, day }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -578,6 +578,8 @@
   // d = { labels: [..], series: [{ name, values, slot | tint | color }], horizontal?, stacked?, valueLabels?, yTicks?, secondary? }
   // secondary: booleans aligned to labels; those bars draw in a lighter tone with muted labels, for
   // rows that break down the bar above them (an expanded group's members).
+  // labelClicks: category-axis labels emit 'click' (params.componentType 'xAxis'/'yAxis', params.value the
+  // label), so a label can act like its bar. Off by default, since it gives every label a pointer cursor.
   // o = { label, format(v) (default count), category (table's first column, default 'Item') }
   // Vertical by default; `horizontal` ranks top-down in the given order, with long names truncated to fit.
   // `valueLabels` prints each bar's value past its end (not with `stacked`). A series colour is its
@@ -606,6 +608,7 @@
     const cat = { type: 'category', inverse: hz,
         data: d.labels.map((l, i) => (sec(i) ? { value: l, textStyle: { color: t.ink2 } } : l)), axisTick: { show: false },
         axisLine: { show: !hz, lineStyle: { color: t.ink } },
+        triggerEvent: !!d.labelClicks,
         axisLabel: Object.assign({ color: t.ink, fontSize: 11, fontFamily: t.fontUi, hideOverlap: !hz },
           hz ? { width: t.small ? 110 : 260, overflow: 'truncate' } : {}) };
       const val = Object.assign({ type: 'value', min: 0, axisLine: { show: false }, axisTick: { show: false },
