@@ -54,6 +54,7 @@ DV.stacked(el, { years, series: [{ name, values, slot }], marks, ages });
 DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], marks });
 DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
 DV.lines(el, { years, series: [{ name, values }], marks, ages });
+DV.bars(el, { labels, series: [{ name, values, slot | tint | color }], horizontal, stacked, valueLabels }, { format, category });
 DV.daily(el, { dates: ['2026-10-03', …], series: [{ name, values }], band: { lo, hi } });
 const c = DV.live(el, { series: [{ name: 'CPU', points: [[Date.now(), 12], …] }], max: 100, format: v => DV.fmt.pct(v) });
 c.push(0, [Date.now(), 14]);
@@ -222,6 +223,10 @@ CSP blocks them.
 
 ## Changes
 
+- **0.7.0** (2026-11-10): `DV.bars`, bars on a category axis: vertical or horizontal (ranked,
+  long names truncated), optionally stacked, with optional value labels past each bar's end.
+  Series may take `color` as a custom property name (`'--series-3'`), read at draw time. Fixes the
+  version string, which 0.6.2 left at 0.6.1.
 - **0.6.2** (2026-11-07): `DV.daily` takes `labels`, so monthly counts can use it without reading as days.
 - **0.5.4** (2026-11-07): a score label goes inside its band only when the band's own run is wide enough for it; a one-year spike followed by zeros is labeled above it, not cut off.
 - **0.5.3** (2026-11-07): the fan's "continues to" label rounds to two significant figures ($39M, not $39.19M): a 95th percentile of 1,000 futures is not that precise.

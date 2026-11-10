@@ -65,6 +65,11 @@
     band: { lo: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 38 : 52), hi: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 58 : 76) } });
   DV.daily('#c-day2', { dates, yTicks: 3, series: [
     { name: 'Family blog', values: blog }, { name: 'Recipe site', values: visits(41, 0) }, { name: 'Photo archive', values: visits(18, 0) }] });
+  DV.bars('#c-bars', { horizontal: true, valueLabels: true, labels: ['Sourdough, the long way', 'Grandma\u2019s pierogi', 'Summer at the lake, 1987',
+    'Fixing the porch swing', 'Plum jam', 'Our first apartment'], series: [{ name: 'Reads', values: [412, 288, 201, 154, 97, 61] }] }, { category: 'Page' });
+  DV.bars('#c-bars2', { stacked: true, labels: ['Q1', 'Q2', 'Q3', 'Q4'], series: [
+    { name: 'Family blog', values: [1240, 1410, 1630, 1380], tint: 1 }, { name: 'Recipe site', values: [820, 760, 990, 1120], tint: 2 },
+    { name: 'Photo archive', values: [310, 290, 420, 380], tint: 3 }] }, { category: 'Quarter' });
   // Live: synthetic smooth signals, so the screenshots are stable. CPU every 2 s, network every 30 s.
   const cpuAt = t => 30 + 15 * Math.sin(t / 37e3) + 8 * Math.sin(t / 11e3);
   const netAt = (t, k) => Math.round((k ? 0.3e6 : 1.2e6) * (1.4 + Math.sin(t / 95e3 + k)));

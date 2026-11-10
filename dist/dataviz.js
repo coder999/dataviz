@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.6.1 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.7.0 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -69,7 +69,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.6.1', fmt: { money, pct, count, day }, time: { trim, held, ago } };
+  const DV = { version: '0.7.0', fmt: { money, pct, count, day }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -95,6 +95,7 @@
     t.tint = [1, 2, 3, 4, 5].map(i => cs.getPropertyValue('--dv-tint-' + i).trim());
     t.line = [1, 2, 3, 4].map(i => cs.getPropertyValue('--dv-line-' + i).trim());
     t.surface = surfaceOf(el, t.ground);
+    t.cssVar = name => cs.getPropertyValue(name).trim();
     t.width = el.clientWidth || 600;
     t.small = t.width < 560;
     return t;
@@ -570,6 +571,62 @@
     }, o.label || 'Daily: ' + d.series.map(s => `${s.name} ${count(s.values[0])} on ${labels[0]}, ${count(s.values[n - 1])} on ${labels[n - 1]}`).join('; '),
     { caption: o.label || 'Daily', columns: ['Date'].concat(d.series.map(s => s.name), b ? [bandName] : []),
       rows: labels.map((l, i) => [l].concat(d.series.map(s => count(s.values[i])), b ? [`${count(b.lo[i])}–${count(b.hi[i])}`] : [])) });
+  };
+
+  /* ---------- DV.bars: bars on a category axis ---------- */
+  // d = { labels: [..], series: [{ name, values, slot | tint | color }], horizontal?, stacked?, valueLabels?, yTicks? }
+  // o = { label, format(v) (default count), category (table's first column, default 'Item') }
+  // Vertical by default; `horizontal` ranks top-down in the given order, with long names truncated to fit.
+  // `valueLabels` prints each bar's value past its end (not with `stacked`). A series colour is its
+  // `slot` (a person), `tint` (not a person) or `color`: a custom property name such as '--series-3',
+  // read at draw time so it follows the theme. With none of those, series take --dv-line-1..4.
+  DV.bars = function (el, d, o) {
+    o = o || {};
+    const fmt = o.format || count, hz = !!d.horizontal, stack = !!d.stacked && d.series.length > 1;
+    const total = i => d.series.reduce((a, s) => a + (s.values[i] || 0), 0);
+    const showLabels = !!d.valueLabels && !stack;
+    return mount(el, t => {
+      const col = (s, k) => (s.slot || s.tint ? seriesColor(t, s, k) : s.color ? (s.color.startsWith('--') ? t.cssVar(s.color) : s.color) : t.line[k % 4]);
+      const end = hz ? [0, 4, 4, 0] : [4, 4, 0, 0];
+      const cat = { type: 'category', data: d.labels, inverse: hz, axisTick: { show: false },
+        axisLine: { show: !hz, lineStyle: { color: t.ink } },
+        axisLabel: Object.assign({ color: t.ink, fontSize: 11, fontFamily: t.fontUi, hideOverlap: !hz },
+          hz ? { width: t.small ? 110 : 260, overflow: 'truncate' } : {}) };
+      const val = Object.assign({ type: 'value', min: 0, axisLine: { show: false }, axisTick: { show: false },
+        splitLine: { lineStyle: { color: t.ruleSoft } },
+        axisLabel: { formatter: v => fmt(v), color: t.ink2, fontSize: 11, fontFamily: t.fontUi } }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {});
+      const multi = d.series.length > 1;
+      return {
+        grid: { left: 8, right: showLabels && hz ? 56 : 12, top: multi ? legendRoom(t, d.series.map(s => s.name)) + 6 : (showLabels && !hz ? 22 : 10), bottom: 0, containLabel: true },
+        legend: multi ? legend(t, d.series.map(s => ({ name: s.name, icon: 'rect' }))) : { show: false },
+        // Built as nodes, not an HTML string: key colours are arbitrary here, and a style="" attribute
+        // would break under the strict CSP the demo is checked against (CSSOM writes are allowed).
+        tooltip: Object.assign(tip(t), { axisPointer: { type: 'shadow', shadowStyle: { color: alpha(t.ink, 0.06) } }, formatter: ps => {
+          const i = ps[0].dataIndex, box = document.createElement('div'), head = box.appendChild(document.createElement('b'));
+          head.textContent = d.labels[i];
+          const row = (name, v, c) => {
+            const r = box.appendChild(document.createElement('div'));
+            r.className = 'dv-tt-row';
+            if (c) { const key = r.appendChild(document.createElement('i')); key.className = 'dv-tt-key'; key.style.background = c; }
+            r.appendChild(document.createTextNode(name));
+            const n = r.appendChild(document.createElement('span')); n.className = 'dv-num'; n.textContent = fmt(v);
+          };
+          d.series.forEach((s, k) => { if (!multi || s.values[i]) row(s.name, s.values[i], col(s, k)); });
+          if (stack) row('Total', total(i));
+          return box; } }),
+        xAxis: hz ? val : cat,
+        yAxis: hz ? cat : val,
+        series: d.series.map((s, k) => ({ name: s.name, type: 'bar', data: s.values, stack: stack ? 'dv' : undefined,
+          barMaxWidth: hz ? 18 : 48, barGap: '12%',
+          // a surface-coloured edge keeps 2px between stacked segments; only unstacked bars get the rounded data end
+          itemStyle: { color: col(s, k), borderRadius: stack ? 0 : end, borderColor: stack ? t.surface : undefined, borderWidth: stack ? 1 : 0 },
+          emphasis: { disabled: true },
+          label: { show: showLabels, position: hz ? 'right' : 'top', distance: 6, formatter: p => fmt(p.value),
+            color: t.ink2, fontSize: 12, fontWeight: 500, fontFamily: t.fontUi } })),
+      };
+    }, o.label || 'Bars: ' + d.labels.slice(0, 3).map((l, i) => `${l} ${fmt(total(i))}`).join(', ') + (d.labels.length > 3 ? ', …' : ''),
+    { caption: o.label || 'Bars', columns: [o.category || 'Item'].concat(d.series.map(s => s.name), stack ? ['Total'] : []),
+      rows: d.labels.map((l, i) => [l].concat(d.series.map(s => fmt(s.values[i] || 0)), stack ? [fmt(total(i))] : [])) });
   };
 
   /* ---------- DV.live: a sliding time window over streaming points ---------- */
