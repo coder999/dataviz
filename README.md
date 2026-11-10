@@ -223,6 +223,8 @@ CSP blocks them.
 
 ## Changes
 
+- **0.7.2** (2026-11-10): `DV.bars` takes `secondary`, booleans aligned to `labels`: those bars draw
+  lighter with muted labels, for rows breaking down the bar above them (an expanded group).
 - **0.7.1** (2026-11-10): `DV.bars` measures its wrapped legend with the real font, so it no longer
   overlaps the plot in narrow cards, and thins value-axis ticks on narrow horizontal charts.
   `DV.daily` keeps its first and last axis labels inside the plot (the last one was clipped).

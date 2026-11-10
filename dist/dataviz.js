@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.7.1 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.7.2 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -69,7 +69,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.7.1', fmt: { money, pct, count, day }, time: { trim, held, ago } };
+  const DV = { version: '0.7.2', fmt: { money, pct, count, day }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -575,7 +575,9 @@
   };
 
   /* ---------- DV.bars: bars on a category axis ---------- */
-  // d = { labels: [..], series: [{ name, values, slot | tint | color }], horizontal?, stacked?, valueLabels?, yTicks? }
+  // d = { labels: [..], series: [{ name, values, slot | tint | color }], horizontal?, stacked?, valueLabels?, yTicks?, secondary? }
+  // secondary: booleans aligned to labels; those bars draw in a lighter tone with muted labels, for
+  // rows that break down the bar above them (an expanded group's members).
   // o = { label, format(v) (default count), category (table's first column, default 'Item') }
   // Vertical by default; `horizontal` ranks top-down in the given order, with long names truncated to fit.
   // `valueLabels` prints each bar's value past its end (not with `stacked`). A series colour is its
@@ -600,7 +602,9 @@
     return mount(el, t => {
       const col = (s, k) => (s.slot || s.tint ? seriesColor(t, s, k) : s.color ? (s.color.startsWith('--') ? t.cssVar(s.color) : s.color) : t.line[k % 4]);
       const end = hz ? [0, 4, 4, 0] : [4, 4, 0, 0];
-      const cat = { type: 'category', data: d.labels, inverse: hz, axisTick: { show: false },
+      const sec = i => !!(d.secondary && d.secondary[i]);
+    const cat = { type: 'category', inverse: hz,
+        data: d.labels.map((l, i) => (sec(i) ? { value: l, textStyle: { color: t.ink2 } } : l)), axisTick: { show: false },
         axisLine: { show: !hz, lineStyle: { color: t.ink } },
         axisLabel: Object.assign({ color: t.ink, fontSize: 11, fontFamily: t.fontUi, hideOverlap: !hz },
           hz ? { width: t.small ? 110 : 260, overflow: 'truncate' } : {}) };
@@ -629,7 +633,8 @@
           return box; } }),
         xAxis: hz ? val : cat,
         yAxis: hz ? cat : val,
-        series: d.series.map((s, k) => ({ name: s.name, type: 'bar', data: s.values, stack: stack ? 'dv' : undefined,
+        series: d.series.map((s, k) => ({ name: s.name, type: 'bar', stack: stack ? 'dv' : undefined,
+          data: s.values.map((v, i) => (sec(i) ? { value: v, itemStyle: { color: alpha(col(s, k), 0.45) } } : v)),
           barMaxWidth: hz ? 18 : 48, barGap: '12%',
           // a surface-coloured edge keeps 2px between stacked segments; only unstacked bars get the rounded data end
           itemStyle: { color: col(s, k), borderRadius: stack ? 0 : end, borderColor: stack ? t.surface : undefined, borderWidth: stack ? 1 : 0 },

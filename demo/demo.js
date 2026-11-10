@@ -66,7 +66,7 @@
   DV.daily('#c-day2', { dates, yTicks: 3, series: [
     { name: 'Family blog', values: blog }, { name: 'Recipe site', values: visits(41, 0) }, { name: 'Photo archive', values: visits(18, 0) }] });
   DV.bars('#c-bars', { horizontal: true, valueLabels: true, labels: ['Sourdough, the long way', 'Grandma\u2019s pierogi', 'Summer at the lake, 1987',
-    'Fixing the porch swing', 'Plum jam', 'Our first apartment'], series: [{ name: 'Reads', values: [412, 288, 201, 154, 97, 61] }] }, { category: 'Page' });
+    'Fixing the porch swing', 'Plum jam', 'Our first apartment'], secondary: [false, false, true, false, false, false], series: [{ name: 'Reads', values: [412, 288, 201, 154, 97, 61] }] }, { category: 'Page' });
   DV.bars('#c-bars2', { stacked: true, labels: ['Q1', 'Q2', 'Q3', 'Q4'], series: [
     { name: 'Family blog', values: [1240, 1410, 1630, 1380], tint: 1 }, { name: 'Recipe site', values: [820, 760, 990, 1120], tint: 2 },
     { name: 'Photo archive', values: [310, 290, 420, 380], tint: 3 }] }, { category: 'Quarter' });
