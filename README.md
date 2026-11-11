@@ -240,6 +240,8 @@ CSP blocks them.
 
 ## Changes
 
+- **0.8.1** (2026-11-11): `DV.treemap` header bands stay tinted at every depth (past the
+  third level they were white, hiding the folder name).
 - **0.8.0** (2026-11-11): `DV.treemap`, nested boxes with click-to-zoom and a breadcrumb;
   formatter `DV.fmt.bytes`.
 - **0.7.3** (2026-11-10): `DV.bars` takes `labelClicks`: category labels emit `click` like their bars.

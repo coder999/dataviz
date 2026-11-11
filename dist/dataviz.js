@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.8.0 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.8.1 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -77,7 +77,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.8.0', fmt: { money, pct, count, day, bytes }, time: { trim, held, ago } };
+  const DV = { version: '0.8.1', fmt: { money, pct, count, day, bytes }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -835,7 +835,9 @@
             formatter: p => `${p.name}\n${f(p.value)}` }, text),
           upperLabel: Object.assign({ show: true, height: sm ? 18 : 20, overflow: 'truncate', ellipsis: '…',
             formatter: p => `${p.name}  ${f(p.value)}` }, text, { fontWeight: 600 }),
-          itemStyle: { borderColor: t.ground, borderWidth: 1, gapWidth: 1 },
+          // every level's header band is a shade of its own colour; a fixed border colour left levels past
+          // the ones listed below with a white band and white, invisible names
+          itemStyle: { borderColorSaturation: 0.5, borderWidth: 1, gapWidth: 1 },
           levels: [
             { itemStyle: { borderWidth: 0, gapWidth: 3 }, upperLabel: { show: false } },
             { itemStyle: { borderWidth: 3, gapWidth: 1, borderColorSaturation: 0.45 } },
