@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.7.3 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.8.0 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -46,6 +46,14 @@
     return signOf(v, body === '0', o) + body;
   }
 
+  // 433.8 GB, 950 B. Binary steps with the familiar labels, as Google Drive and Finder's "used" do.
+  function bytes(v) {
+    if (v == null || !isFinite(v)) return '—';
+    let a = Math.abs(v), u = 0;
+    while (a >= 1023.95 && u < 4) { a /= 1024; u++; }
+    return (v < 0 ? MINUS : '') + (u ? a.toFixed(1) : Math.round(a)) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][u];
+  }
+
   // '2026-10-03' -> 'Oct 3'. Read as UTC so no viewer timezone moves it a day.
   function day(iso) {
     return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -69,7 +77,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.7.3', fmt: { money, pct, count, day }, time: { trim, held, ago } };
+  const DV = { version: '0.8.0', fmt: { money, pct, count, day, bytes }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -795,6 +803,51 @@
     }, o.label || `Cash flow: ${money(total)} in from ${d.nodes.filter(n => side(n) === 'left').length} sources. ` +
       d.nodes.filter(n => side(n) === 'right').map(n => `${n.name} ${money(flow(n))}`).join(', '),
     { caption: o.label || 'Cash flow', columns: ['From', 'To', 'Amount'], rows: d.links.map(l => [l.source, l.target, money(l.value, { full: true })]) });
+  };
+
+  // A nested { name, value, children } tree as nested boxes sized by value. Each top-level branch takes the
+  // next entity colour; deeper boxes keep it. The chart shows o.depth levels at once (default 2): click a box
+  // to zoom into it, the breadcrumb climbs back. Values are formatted with o.format (default DV.fmt.count).
+  // A parent's value must be at least the sum of its children's; any excess is its own share.
+  DV.treemap = function (el, tree, o) {
+    o = o || {};
+    const f = o.format || (v => count(v)), top = (tree.children || []).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+    const total = tree.value != null ? tree.value : top.reduce((s, c) => s + c.value, 0);
+    const pathOf = p => (p.treePathInfo || []).slice(1).map(x => x.name);
+    return mount(el, t => {
+      const sm = t.small, text = { color: t.onEntity, fontFamily: t.fontUi, fontSize: sm ? 10 : 11 };
+      return {
+        tooltip: { trigger: 'item', confine: true, className: 'dv-tt', backgroundColor: t.plate, borderColor: t.rule, borderWidth: 1, padding: [8, 10],
+          textStyle: { color: t.ink, fontFamily: t.fontUi, fontSize: 12 }, extraCssText: 'box-shadow:none;border-radius:2px',
+          formatter: p => {
+            const path = pathOf(p), up = (p.treePathInfo || [])[path.length - 1];
+            const share = up && up.value ? ` · ${pct(p.value / up.value * 100)} of ${esc(up.name)}` : '';
+            return `<b>${path.map(esc).join(' / ') || esc(tree.name)}</b><br><span class="dv-num">${f(p.value)}</span>${share}`;
+          } },
+        series: [{
+          type: 'treemap', name: tree.name, roam: false, nodeClick: 'zoomToNode', leafDepth: o.depth || 2, animation: false,
+          top: 0, left: 0, right: 0, bottom: 30, visibleMin: 64, childrenVisibleMin: 900, squareRatio: 1.2,
+          breadcrumb: { show: true, left: 0, bottom: 0, height: 22, emptyItemWidth: 16,
+            itemStyle: { color: t.plate, borderColor: t.rule, borderWidth: 1, shadowBlur: 0, textStyle: { color: t.ink, fontFamily: t.fontUi, fontSize: 12 } },
+            emphasis: { itemStyle: { color: t.accentWash, textStyle: { color: t.ink } } } },
+          // names over values; ECharts drops a label that does not fit its box
+          label: Object.assign({ show: true, position: 'insideTopLeft', overflow: 'truncate', ellipsis: '…',
+            formatter: p => `${p.name}\n${f(p.value)}` }, text),
+          upperLabel: Object.assign({ show: true, height: sm ? 18 : 20, overflow: 'truncate', ellipsis: '…',
+            formatter: p => `${p.name}  ${f(p.value)}` }, text, { fontWeight: 600 }),
+          itemStyle: { borderColor: t.ground, borderWidth: 1, gapWidth: 1 },
+          levels: [
+            { itemStyle: { borderWidth: 0, gapWidth: 3 }, upperLabel: { show: false } },
+            { itemStyle: { borderWidth: 3, gapWidth: 1, borderColorSaturation: 0.45 } },
+            { itemStyle: { borderWidth: 1, gapWidth: 1, borderColorSaturation: 0.6 }, colorSaturation: [0.3, 0.55] },
+          ],
+          data: top.map((c, k) => Object.assign({}, c, { itemStyle: { color: slotColor(t, k + 1) } })),
+        }],
+      };
+    }, o.label || `${tree.name}: ${f(total)} in ${top.length} parts. Largest: ` +
+      top.slice(0, 3).map(c => `${c.name} ${f(c.value)}`).join(', '),
+    { caption: o.label || tree.name, columns: ['Part', 'Size', 'Share'],
+      rows: top.map(c => [c.name, f(c.value), total ? pct(c.value / total * 100, { digits: 1 }) : '—']) });
   };
 
   DV.theme = theme;

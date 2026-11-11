@@ -1,7 +1,7 @@
 // node test/format.test.js — exits non-zero on the first failure
 const assert = require('assert');
 const { fmt } = require('../dist/dataviz.js');
-const { money, pct, count, day } = fmt;
+const { money, pct, count, day, bytes } = fmt;
 const M = '−';
 
 const cases = [
@@ -50,6 +50,16 @@ const cases = [
   [day('2026-10-03'), 'Oct 3'],
   [day('2026-12-31'), 'Dec 31'],                // UTC: no timezone can shift it a day
   [day('2027-01-01'), 'Jan 1'],
+  [bytes(0), '0 B'],
+  [bytes(950), '950 B'],
+  [bytes(1023), '1023 B'],
+  [bytes(1024), '1.0 KB'],
+  [bytes(1048575), '1.0 MB'],    // never "1024.0 KB"
+  [bytes(465789203251.2), '433.8 GB'],
+  [bytes(2 * 1099511627776), '2.0 TB'],
+  [bytes(5 * 1125899906842624), '5120.0 TB'],   // TB is the last unit
+  [bytes(-2048), M + '2.0 KB'],
+  [bytes(null), '—'],
 ];
 cases.forEach(([got, want], i) => assert.strictEqual(got, want, `case ${i}: got ${got}, want ${want}`));
 console.log(`ok ${cases.length} formatter cases`);

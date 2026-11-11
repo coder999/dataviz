@@ -55,6 +55,7 @@ DV.score(el, { years, ages: [[…], […]], staves: [{ name, values, slot }], ma
 DV.sankey(el, { nodes: [{ name, slot | tint }], links: [{ source, target, value }] });
 DV.lines(el, { years, series: [{ name, values }], marks, ages });
 DV.bars(el, { labels, series: [{ name, values, slot | tint | color }], horizontal, stacked, valueLabels }, { format, category });
+DV.treemap(el, { name, value, children: [{ name, value, children }] }, { format: DV.fmt.bytes, depth: 2 });
 DV.daily(el, { dates: ['2026-10-03', …], series: [{ name, values }], band: { lo, hi } });
 const c = DV.live(el, { series: [{ name: 'CPU', points: [[Date.now(), 12], …] }], max: 100, format: v => DV.fmt.pct(v) });
 c.push(0, [Date.now(), 14]);
@@ -156,6 +157,20 @@ Hovering a node highlights its flows. The hidden table lists every flow as
 From / To / Amount. There is no year axis and no rehearsal marks: draw one
 sankey per year and let a control pick the year.
 
+### Treemap
+
+`DV.treemap` draws a nested `{ name, value, children }` tree as boxes sized by
+value: a WinDirStat-style storage map, or any breakdown with more than one level.
+A parent's `value` must be at least the sum of its children's; any excess is its
+own share. Each top-level branch takes the next entity colour (cycling after six)
+and its descendants keep that hue. `depth` levels show at once (default 2).
+Clicking a box zooms into it and the breadcrumb under the chart climbs back.
+Labels are the name over the value and are truncated, or dropped, when a box is
+too small. The tooltip gives the full path, the value and its share of the
+parent. Values format with `format` (default `DV.fmt.count`; pass
+`DV.fmt.bytes` for storage). The hidden table lists the top level: Part, Size,
+Share. A redraw (resize or theme change) returns to the top.
+
 ### Status colours
 
 `--dv-status-ok` (done, saved) and `--dv-status-error` (an error, a destructive
@@ -204,6 +219,8 @@ tooltip and in the data table, for series that are not daily (monthly counts: `O
 `sign`). `DV.fmt.pct(v, { digits, sign })` returns `87%`.
 `DV.fmt.count(v, { compact, sign })` returns `12,308`, or `950` / `1.2k` / `12k` / `2.5M`
 with `compact` (never `1000` or `1000k`). `DV.fmt.day('2026-10-03')` returns `Oct 3`.
+`DV.fmt.bytes(v)` returns `950 B`, `1.0 KB`, `433.8 GB`: binary steps (1024) with the
+usual labels, as Google Drive reports storage, and never `1024.0 KB`.
 
 ### Accessibility
 
@@ -223,6 +240,8 @@ CSP blocks them.
 
 ## Changes
 
+- **0.8.0** (2026-11-11): `DV.treemap`, nested boxes with click-to-zoom and a breadcrumb;
+  formatter `DV.fmt.bytes`.
 - **0.7.3** (2026-11-10): `DV.bars` takes `labelClicks`: category labels emit `click` like their bars.
 - **0.7.2** (2026-11-10): `DV.bars` takes `secondary`, booleans aligned to `labels`: those bars draw
   lighter with muted labels, for rows breaking down the bar above them (an expanded group).

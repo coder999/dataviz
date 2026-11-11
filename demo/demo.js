@@ -57,6 +57,21 @@
     { source: 'Alex · Social Security', target: hub, value: 14000 }, { source: 'Pre-tax withdrawals', target: hub, value: 40000 },
     { source: 'Employer match', target: hub, value: 9000 }, { source: '529 withdrawals', target: hub, value: 6000 },
     { source: hub, target: 'Taxes', value: 62000 }, { source: hub, target: 'Spending', value: 190000 }, { source: hub, target: 'Saved', value: 37000 }] });
+  // A fictional household drive. Sizes in bytes; folders total their children.
+  const GB = 1073741824, MB = 1048576, sum = n => (n.children ? (n.value = n.children.reduce((s, c) => s + sum(c), n.value || 0)) : n.value);
+  const files = (prefix, sizes) => sizes.map((v, i) => ({ name: `${prefix} ${String(i + 1).padStart(2, '0')}`, value: v }));
+  const drive = { name: 'Shared drive', children: [
+    { name: 'Photos', children: ['2022', '2023', '2024', '2025', '2026'].map((y, i) => ({ name: y, children: files('Album', [3.1, 2.2, 1.4, 0.9, 0.6, 0.4].map(v => v * GB * (1 + i / 3))) })) },
+    { name: 'Home videos', children: files('Clip', [9.4, 6.1, 4.8, 2.2, 1.7, 0.8].map(v => v * GB)) },
+    { name: 'Backups', children: [{ name: 'Laptop', children: files('Snapshot', [7.2, 7.1, 6.9].map(v => v * GB)) }, { name: 'Phone', children: files('Archive', [3.3, 2.9].map(v => v * GB)) }] },
+    { name: 'School', children: [{ name: 'Alex', children: files('Course', [1.9, 1.2, 0.7, 0.4].map(v => v * GB)) }, { name: 'Sam', children: files('Course', [0.8, 0.5, 0.3].map(v => v * GB)) }] },
+    { name: 'Music', children: files('Album', [620, 540, 480, 410, 380, 300, 220, 150].map(v => v * MB)) },
+    { name: 'Taxes', children: ['2023', '2024', '2025'].map(y => ({ name: y, children: files('Return', [180, 95, 40].map(v => v * MB)) })) },
+    { name: 'Files at the top level', children: files('File', [410, 220, 90, 40].map(v => v * MB)) },
+    { name: 'Trash', children: files('Deleted', [1.6, 0.7, 0.3].map(v => v * GB)) },
+  ] };
+  sum(drive);
+  DV.treemap('#c-tm', drive, { format: DV.fmt.bytes });
   // 28 fictional days ending 30 Oct 2026: weekday traffic, weekend dips, a slow fall in the last week
   const dates = Array.from({ length: 28 }, (_, i) => new Date(Date.UTC(2026, 9, 3 + i)).toISOString().slice(0, 10));
   const visits = (base, drift) => dates.map((_, i) => Math.round(base * ((i % 7 === 2 || i % 7 === 3) ? 0.74 : 1) * (1 + 0.08 * Math.sin(i * 1.7)) * (i > 20 ? 1 - drift * (i - 20) : 1)));
