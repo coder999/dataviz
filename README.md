@@ -240,6 +240,9 @@ CSP blocks them.
 
 ## Changes
 
+- **0.8.2** (2026-11-11): `DV.daily` takes `pointLabels` (each value above its point, colliding
+  labels dropped), per-series `color` (a custom property name or colour) and `dash` (0-3) for more
+  than four lines, and `o.format`; its legend room is measured, and its tooltip built from nodes.
 - **0.8.1** (2026-11-11): `DV.treemap` header bands stay tinted at every depth (past the
   third level they were white, hiding the folder name).
 - **0.8.0** (2026-11-11): `DV.treemap`, nested boxes with click-to-zoom and a breadcrumb;

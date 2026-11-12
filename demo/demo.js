@@ -78,7 +78,7 @@
   const blog = visits(64, 0.05);
   DV.daily('#c-day', { dates, yTicks: 3, series: [{ name: 'Visitors', values: blog }],
     band: { lo: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 38 : 52), hi: dates.map((_, i) => (i % 7 === 2 || i % 7 === 3) ? 58 : 76) } });
-  DV.daily('#c-day2', { dates, yTicks: 3, series: [
+  DV.daily('#c-day2', { dates, yTicks: 3, pointLabels: true, series: [
     { name: 'Family blog', values: blog }, { name: 'Recipe site', values: visits(41, 0) }, { name: 'Photo archive', values: visits(18, 0) }] });
   DV.bars('#c-bars', { horizontal: true, valueLabels: true, labels: ['Sourdough, the long way', 'Grandma\u2019s pierogi', 'Summer at the lake, 1987',
     'Fixing the porch swing', 'Plum jam', 'Our first apartment'], secondary: [false, false, true, false, false, false], series: [{ name: 'Reads', values: [412, 288, 201, 154, 97, 61] }] }, { category: 'Page' });

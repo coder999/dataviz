@@ -1,4 +1,4 @@
-/*! coder999/dataviz v0.8.1 · "Full Score" ECharts builders · MIT
+/*! coder999/dataviz v0.8.2 · "Full Score" ECharts builders · MIT
  * Plain script, no modules. Load echarts.min.js first, then this; exposes window.DV.
  * Colours and fonts come from the --dv-* tokens in dataviz.css, read at render time,
  * so charts follow light/dark and re-render when the scheme or data-theme changes. */
@@ -77,7 +77,7 @@
     return m <= 0 ? 'now' : MINUS + m + 'm';
   }
 
-  const DV = { version: '0.8.1', fmt: { money, pct, count, day, bytes }, time: { trim, held, ago } };
+  const DV = { version: '0.8.2', fmt: { money, pct, count, day, bytes }, time: { trim, held, ago } };
   if (typeof module === 'object' && module.exports) module.exports = DV;
   if (typeof document === 'undefined') return; // Node: formatters only
 
@@ -550,36 +550,55 @@
   // band?:{lo:[], hi:[], name?}, yTicks?, labels?}. labels replaces the 'Oct 3' axis text (e.g. monthly 'Oct ’26'). One series without a band draws as a filled area; otherwise lines
   // in --dv-line-k with DV.lines' dash patterns and a legend. band shades a normal range behind the
   // data (default name "Normal range"). Values are counts, formatted with DV.fmt.count.
+  // Since 0.8.2: d.pointLabels prints each point's value above it (labels that would collide are
+  // dropped); a series may take `color` (a custom property name such as '--series-3', read at draw
+  // time, or a colour) and `dash` (0-3, a DASH step), for more than four lines; o.format formats
+  // values in labels, tooltip and table (default count).
   DV.daily = function (el, d, o) {
     o = o || {};
     const n = d.dates.length, labels = d.labels || d.dates.map(day), solo = d.series.length === 1;
-    const b = d.band, bandName = b && (b.name || 'Normal range');
+    const b = d.band, bandName = b && (b.name || 'Normal range'), fmt = o.format || count;
     return mount(el, t => {
-      const col = k => t.line[k % 4], series = [];
+      const col = k => { const c = d.series[k].color; return c ? (c.startsWith('--') ? t.cssVar(c) : c) : t.line[k % 4]; };
+      const dash = k => DASH[d.series[k].dash != null ? d.series[k].dash % 4 : (d.series[k].color ? 0 : k % 4)];
+      const series = [];
       if (b) { // stacked pair: an invisible floor at lo, then the range (hi − lo) filled on top of it
         const quiet = { type: 'line', stack: 'dv-band', silent: true, symbol: 'none', lineStyle: { opacity: 0 }, z: 1 };
         series.push(Object.assign({ name: 'dv-band-floor', data: b.lo }, quiet),
           Object.assign({ name: bandName, data: b.hi.map((h, i) => h - b.lo[i]), areaStyle: { color: alpha(t.ink3, 0.14) } }, quiet));
       }
-      d.series.forEach((s, k) => series.push({ name: s.name, type: 'line', symbol: 'none', data: s.values, z: 4 - k % 4,
-        itemStyle: { color: col(k) }, lineStyle: { color: col(k), width: 2, type: DASH[k % 4] },
+      d.series.forEach((s, k) => series.push({ name: s.name, type: 'line', data: s.values, z: 4 - k % 4,
+        symbol: d.pointLabels ? 'circle' : 'none', symbolSize: 5, showSymbol: !!d.pointLabels,
+        itemStyle: { color: col(k) }, lineStyle: { color: col(k), width: 2, type: dash(k) },
+        label: { show: !!d.pointLabels, position: 'top', distance: 6, formatter: p => fmt(p.value),
+          color: t.ink2, fontSize: 11, fontWeight: 500, fontFamily: t.fontUi },
+        labelLayout: { hideOverlap: true },
         areaStyle: solo && !b ? { color: alpha(col(k), 0.12) } : undefined }));
       return {
-        grid: { left: 8, right: 12, top: solo ? 12 : 34, bottom: 0, containLabel: true },
+        grid: { left: 8, right: 12, top: (solo ? 12 : legendHeight(t, d.series.map(s => s.name)) + 8) + (d.pointLabels ? 14 : 0), bottom: 0, containLabel: true },
         legend: solo ? { show: false } : legend(t, d.series.map(s => s.name)),
-        tooltip: Object.assign(tip(t), { formatter: ps => { const i = ps[0].dataIndex;
-          return `<b>${esc(labels[i])}</b>` + d.series.map((s, k) => ttRow('dv-line-' + (k % 4 + 1), s.name, count(s.values[i]))).join('') +
-            (b ? ttRow('dv-band', bandName, `${count(b.lo[i])}–${count(b.hi[i])}`) : ''); } }),
-        xAxis: { type: 'category', boundaryGap: false, data: labels, axisLine: { lineStyle: { color: t.ink } }, axisTick: { show: false },
+        // nodes, not an HTML string: a key's colour may be arbitrary, and style="" breaks the strict CSP
+        tooltip: Object.assign(tip(t), { formatter: ps => { const i = ps[0].dataIndex, box = document.createElement('div');
+          box.appendChild(document.createElement('b')).textContent = labels[i];
+          const row = (name, v, c, cls) => { const r = box.appendChild(document.createElement('div')); r.className = 'dv-tt-row';
+            const key = r.appendChild(document.createElement('i')); key.className = 'dv-tt-key' + (cls ? ' ' + cls : ''); if (c) key.style.background = c;
+            r.appendChild(document.createTextNode(name)); const nn = r.appendChild(document.createElement('span')); nn.className = 'dv-num'; nn.textContent = v; };
+          d.series.forEach((s, k) => row(s.name, fmt(s.values[i]), col(k)));
+          if (b) row(bandName, `${fmt(b.lo[i])}–${fmt(b.hi[i])}`, null, 'dv-band');
+          return box; } }),
+        // pointLabels insets the points half a step from each edge, so the first and last values are
+        // neither clipped nor drawn over the value axis; otherwise the line runs edge to edge.
+        xAxis: { type: 'category', boundaryGap: !!d.pointLabels, data: labels, axisLine: { lineStyle: { color: t.ink } }, axisTick: { show: false },
           // first and last labels sit inside the plot, not centred on its edges where they were clipped
-          axisLabel: { color: t.ink, fontSize: 11, hideOverlap: true, alignMinLabel: 'left', alignMaxLabel: 'right' } },
+          axisLabel: Object.assign({ color: t.ink, fontSize: 11, hideOverlap: true },
+            d.pointLabels ? {} : { alignMinLabel: 'left', alignMaxLabel: 'right' }) },
         yAxis: Object.assign({ type: 'value', min: 0, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: t.ruleSoft } },
           axisLabel: { formatter: v => count(v, { compact: true }), color: t.ink2, fontSize: 11, fontFamily: t.fontUi } }, d.yTicks ? { splitNumber: d.yTicks - 1 } : {}),
         series,
       };
-    }, o.label || 'Daily: ' + d.series.map(s => `${s.name} ${count(s.values[0])} on ${labels[0]}, ${count(s.values[n - 1])} on ${labels[n - 1]}`).join('; '),
+    }, o.label || 'Daily: ' + d.series.map(s => `${s.name} ${fmt(s.values[0])} on ${labels[0]}, ${fmt(s.values[n - 1])} on ${labels[n - 1]}`).join('; '),
     { caption: o.label || 'Daily', columns: ['Date'].concat(d.series.map(s => s.name), b ? [bandName] : []),
-      rows: labels.map((l, i) => [l].concat(d.series.map(s => count(s.values[i])), b ? [`${count(b.lo[i])}–${count(b.hi[i])}`] : [])) });
+      rows: labels.map((l, i) => [l].concat(d.series.map(s => fmt(s.values[i])), b ? [`${fmt(b.lo[i])}–${fmt(b.hi[i])}`] : [])) });
   };
 
   /* ---------- DV.bars: bars on a category axis ---------- */
